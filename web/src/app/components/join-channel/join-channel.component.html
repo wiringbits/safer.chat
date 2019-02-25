@@ -1,0 +1,11 @@
+<div>
+  <form [formGroup]="form" (ngSubmit)="join()" novalidate>
+    <div>
+      <input type="text" class="form-control" formControlName="channel" placeholder="New channel">
+      <input type="text" class="form-control" formControlName="name" placeholder="Name">
+    </div>
+    <div>
+      <button type="submit" [disabled]="form.invalid">Create</button>
+    </div>
+  </form>
+</div>
