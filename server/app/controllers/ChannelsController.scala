@@ -1,35 +1,24 @@
 package controllers
 
-import akka.actor.Actor
-import javax.inject.Inject
-import play.api.libs.json.{JsValue, Reads}
-import play.api.mvc.{AbstractController, ControllerComponents}
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import com.alexitc.chat.actors.{ChannelHandlerActor, PeerActor}
+import javax.inject.{Inject, Singleton}
+import play.api.libs.streams.ActorFlow
+import play.api.mvc.{AbstractController, ControllerComponents, WebSocket}
 
-class ChannelsController @Inject() (cc: ControllerComponents) extends AbstractController(cc) {
+@Singleton
+class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: ActorSystem, mat: Materializer) extends AbstractController(cc) {
 
-  def create() = Action.async[JsValue] { x =>
-    ???
-  }
-}
+  import PeerActor.transformer
 
-class ChannelName(val string: String) extends AnyVal
-object ChannelName {
-  def from(string: String): Option[ChannelName] = {
-    ???
-  }
+  val channelHandler: ChannelHandlerActor.Ref = ChannelHandlerActor.Ref(
+    system.actorOf(ChannelHandlerActor.props, "channel-handler")
+  )
 
-  implicit val reads: Reads[ChannelName] = ???
-}
-
-case class CreateChannelRequest(channel: ChannelName, author: String, publicKey: String)
-object CreateChannelRequest {
-
-  implicit val reads: Reads[CreateChannelRequest] = ???
-
-}
-
-class Channel(name: String) extends Actor {
-  override def receive: Receive = {
-    ???
+  def ws() = WebSocket.accept[PeerActor.Command, PeerActor.Event] { _ =>
+    ActorFlow.actorRef { client =>
+      PeerActor.props(client, channelHandler)
+    }
   }
 }

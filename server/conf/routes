@@ -4,4 +4,4 @@
 # ~~~~
 
 
-POST   /channels   controllers.ChannelsController.create()
+GET /ws controllers.ChannelsController.ws()
