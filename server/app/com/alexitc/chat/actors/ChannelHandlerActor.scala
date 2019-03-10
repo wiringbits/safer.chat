@@ -7,66 +7,71 @@ class ChannelHandlerActor extends Actor {
 
   import ChannelHandlerActor._
 
-  private var channels: Map[String, Channel] = Map.empty
+  private var channels: Map[Channel.Name, Channel] = Map.empty
 
   override def receive: Receive = {
-    case Command.JoinChannel(channelName, name) =>
-      println(s"a peer with name=$name is trying to join channel=$channelName")
-
-      val who = Peer(name, sender())
+    case Command.JoinChannel(channelName, peerName) =>
+      val who = Peer(peerName, sender())
       val channel = getOrCreate(channelName)
-      if (channel.contains(who)) {
-        println(s"rejecting command, name=$name already taken on channel=$channelName")
-        who.ref ! Event.PeerRejected("The name is already taken")
-      } else {
-        println(s"$name has joined $channelName")
-        val newChannel = channel.join(who)
-
-        update(channelName, newChannel)
-        notifyPeerJoined(channel, who)
-
-        who.ref ! Event.ChannelJoined(channelName, name)
-      }
+      joinChannel(who, channel)
 
     case Command.LeaveChannel(channelName) =>
       val whoRef = sender()
       val channel = getOrCreate(channelName)
-      channel
-          .participants
-          .find(_.ref == whoRef)
-          .foreach { who =>
-            println(s"${who.name} is leaving $channelName")
+      val whoMaybe = channel.peers.find(_.ref == whoRef)
 
-            val newChannel = channel.leave(who)
-            update(channelName, newChannel)
-            notifyPeerLeft(channel, who)
-          }
+      whoMaybe.foreach { leaveChannel(_, channel) }
   }
 
-  private def getOrCreate(channelName: String): Channel = {
-    channels.getOrElse(channelName, Channel.empty)
+  private def getOrCreate(name: Channel.Name): Channel = {
+    channels.getOrElse(name, Channel.empty(name))
   }
 
-  private def update(channelName: String, channel: Channel): Unit = {
-    channels = channels.updated(channelName, channel)
+  private def update(channel: Channel): Unit = {
+    channels = channels.updated(channel.name, channel)
   }
 
   private def notifyPeerJoined(channel: Channel, who: Peer): Unit = {
     val event = Event.PeerJoined(who)
-
-    channel
-        .participants
-        .filter(_.name != who.name)
-        .foreach(_.ref ! event)
+    notify(channel, who, event)
   }
 
   private def notifyPeerLeft(channel: Channel, who: Peer): Unit = {
     val event = Event.PeerLeft(who)
+    notify(channel, who, event)
+  }
 
+  private def notify(channel: Channel, who: Peer, event: Event): Unit = {
     channel
-        .participants
+        .peers
         .filter(_.name != who.name)
         .foreach(_.ref ! event)
+  }
+
+  private def joinChannel(who: Peer, channel: Channel): Unit = {
+    println(s"a peer with name=${who.name} is trying to join channel=${channel.name}")
+
+    if (channel.contains(who)) {
+      println(s"rejecting command, name=${who.name} already taken on channel=${channel.name}")
+
+      who.ref ! Event.PeerRejected("The name is already taken")
+    } else {
+      println(s"${who.name} has joined ${channel.name}")
+
+      val newChannel = channel.join(who)
+      update(newChannel)
+      notifyPeerJoined(channel, who)
+
+      who.ref ! Event.ChannelJoined(channel, who.name)
+    }
+  }
+
+  private def leaveChannel(who: Peer, channel: Channel): Unit = {
+    println(s"${who.name} is leaving ${channel.name}")
+
+    val newChannel = channel.leave(who)
+    update(newChannel)
+    notifyPeerLeft(channel, who)
   }
 }
 
@@ -76,15 +81,15 @@ object ChannelHandlerActor {
 
   case class Ref(actor: ActorRef) extends AnyVal
 
-  sealed trait Command
+  sealed trait Command extends Product with Serializable
   object Command {
-    final case class JoinChannel(channelName: String, name: String) extends Command
-    final case class LeaveChannel(channelName: String) extends Command
+    final case class JoinChannel(channel: Channel.Name, who: Peer.Name) extends Command
+    final case class LeaveChannel(channel: Channel.Name) extends Command
   }
 
-  sealed trait Event
+  sealed trait Event extends Product with Serializable
   object Event {
-    final case class ChannelJoined(channelName: String, name: String) extends Event
+    final case class ChannelJoined(channel: Channel, who: Peer.Name) extends Event
     final case class PeerJoined(peer: Peer) extends Event
     final case class PeerLeft(peer: Peer) extends Event
     final case class PeerRejected(reason: String) extends Event

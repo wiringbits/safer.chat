@@ -2,15 +2,18 @@ package controllers
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer
+import com.alexitc.chat.actors.PeerActor.{Command, Event}
 import com.alexitc.chat.actors.{ChannelHandlerActor, PeerActor}
+import com.alexitc.chat.models.{Channel, Message, Peer}
 import javax.inject.{Inject, Singleton}
+import play.api.libs.json._
 import play.api.libs.streams.ActorFlow
 import play.api.mvc.{AbstractController, ControllerComponents, WebSocket}
 
 @Singleton
 class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: ActorSystem, mat: Materializer) extends AbstractController(cc) {
 
-  import PeerActor.transformer
+  import ChannelsController._
 
   val channelHandler: ChannelHandlerActor.Ref = ChannelHandlerActor.Ref(
     system.actorOf(ChannelHandlerActor.props, "channel-handler")
@@ -20,5 +23,79 @@ class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: A
     ActorFlow.actorRef { client =>
       PeerActor.props(client, channelHandler)
     }
+  }
+}
+
+object ChannelsController {
+
+  private def customFormat[Outer, Inner: Format](wrap: Inner => Outer, unwrap: Outer => Inner): Format[Outer] = new Format[Outer] {
+    override def reads(json: JsValue): JsResult[Outer] = {
+      json
+          .validate[Inner]
+          .map(wrap)
+    }
+
+    override def writes(o: Outer): JsValue = {
+      Json.toJson(unwrap(o))
+    }
+  }
+
+  private implicit val messageFormat: Format[Message] = customFormat[Message, String](Message.apply, _.string)
+  private implicit val peerNameFormat: Format[Peer.Name] = customFormat[Peer.Name, String](Peer.Name.apply, _.string)
+  private implicit val channelNameFormat: Format[Channel.Name] = customFormat[Channel.Name, String](Channel.Name.apply, _.string)
+
+  private val joinChannelReads: Reads[Command.JoinChannel] = Json.reads[Command.JoinChannel]
+  private val sendMessageReads: Reads[Command.SendMessage] = Json.reads[Command.SendMessage]
+
+  implicit val reads: Reads[Command] = (json: JsValue) => {
+    val result = for {
+      tpe <- (json \ "type").validate[String]
+    } yield tpe match {
+      case "joinChannel" => (json \ "data").validate[Command.JoinChannel](joinChannelReads)
+      case "sendMessage" => (json \ "data").validate[Command.SendMessage](sendMessageReads)
+    }
+
+    result.flatMap(identity)
+  }
+
+  private val channelJoinedWrites: Writes[Event.ChannelJoined] = Json.writes[Event.ChannelJoined]
+  private val peerJoinedWrites: Writes[Event.PeerJoined] = Json.writes[Event.PeerJoined]
+  private val peerLeftWrites: Writes[Event.PeerLeft] = Json.writes[Event.PeerLeft]
+  private val messageReceivedWrites: Writes[Event.MessageReceived] = Json.writes[Event.MessageReceived]
+  private val commandRejectedWrites: Writes[Event.CommandRejected] = Json.writes[Event.CommandRejected]
+
+  implicit val writes: Writes[Event] = {
+    case obj: Event.ChannelJoined =>
+      Json.obj(
+        "type" -> "channelJoined",
+        "data" -> Json.toJson(obj)(channelJoinedWrites))
+
+    case obj: Event.PeerJoined =>
+      Json.obj(
+        "type" -> "peerJoined",
+        "data" -> Json.toJson(obj)(peerJoinedWrites)
+      )
+
+    case obj: Event.PeerLeft =>
+      Json.obj(
+        "type" -> "peerLeft",
+        "data" -> Json.toJson(obj)(peerLeftWrites)
+      )
+
+    case obj: Event.MessageReceived =>
+      Json.obj(
+        "type" -> "messageReceived",
+        "data" -> Json.toJson(obj)(messageReceivedWrites)
+      )
+
+    case obj: Event.CommandRejected =>
+      Json.obj(
+        "type" -> "commandRejected",
+        "data" -> Json.toJson(obj)(commandRejectedWrites)
+      )
+  }
+
+  implicit val transformer: WebSocket.MessageFlowTransformer[Command, Event] = {
+    WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer[Command, Event]
   }
 }

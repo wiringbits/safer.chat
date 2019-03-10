@@ -1,8 +1,7 @@
 package com.alexitc.chat.actors
 
 import akka.actor.{Actor, ActorRef, Props}
-import play.api.libs.json.{JsValue, Json, Reads, Writes}
-import play.api.mvc.WebSocket
+import com.alexitc.chat.models.{Channel, Message, Peer}
 
 class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) extends Actor {
 
@@ -12,8 +11,8 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
 
   private def leaveCurrentChannel(): Unit = {
     state match {
-      case State.OnChannel(channel, _) =>
-        channelHandler.actor ! ChannelHandlerActor.Command.LeaveChannel(channel)
+      case State.OnChannel(_, channel) =>
+        channelHandler.actor ! ChannelHandlerActor.Command.LeaveChannel(channel.name)
         state = State.Idle
 
       case _ => ()
@@ -29,20 +28,44 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
       leaveCurrentChannel()
       channelHandler.actor ! ChannelHandlerActor.Command.JoinChannel(channelName, name)
 
-    case msg: ChannelHandlerActor.Event =>
-      handleChannelHandlerResponse(msg)
+    case Command.SendMessage(to, message) =>
+      state match {
+        case s: State.OnChannel =>
+          val peerMaybe = s.channel.peers.find(_.name == to)
+          peerMaybe.foreach { peer =>
+            peer.ref ! Event.MessageReceived(s.me, message)
+          }
+
+        case _ => ()
+      }
+
+    case msg: Event => client ! msg
+    case msg: ChannelHandlerActor.Event => handleChannelHandlerResponse(msg)
+    case x => println(s"Unexpected message: $x")
   }
 
   def handleChannelHandlerResponse(event: ChannelHandlerActor.Event): Unit = event match {
-    case ChannelHandlerActor.Event.ChannelJoined(channelName, name) =>
-      state = State.OnChannel(channelName, name)
-      client ! Event.ChannelJoined(channelName)
+    case ChannelHandlerActor.Event.ChannelJoined(channel, who) =>
+      state = State.OnChannel(who, channel)
+      client ! Event.ChannelJoined(channel.name, channel.peers.map(_.name))
 
     case ChannelHandlerActor.Event.PeerJoined(who) =>
-      client ! Event.PeerJoined(who.name)
+      state match {
+        case x: State.OnChannel =>
+          state = x.add(who)
+          client ! Event.PeerJoined(who.name)
+
+        case _ => ()
+      }
 
     case ChannelHandlerActor.Event.PeerLeft(who) =>
-      client ! Event.PeerLeft(who.name)
+      state match {
+        case x: State.OnChannel =>
+          state = x.remove(who)
+          client ! Event.PeerLeft(who.name)
+
+        case _ => ()
+      }
 
     case ChannelHandlerActor.Event.PeerRejected(reason) =>
       client ! Event.CommandRejected(reason)
@@ -56,60 +79,30 @@ object PeerActor {
   sealed trait State
   object State {
     final case object Idle extends State
-    final case class OnChannel(channel: String, name: String) extends State
+    final case class OnChannel(me: Peer.Name, channel: Channel) extends State {
+      def add(peer: Peer): OnChannel = OnChannel(
+        me,
+        channel.copy(peers = channel.peers + peer))
+
+      def remove(peer: Peer): OnChannel = OnChannel(
+        me,
+        channel.copy(peers = channel.peers - peer))
+    }
   }
 
-  sealed trait Command
+  sealed trait Command extends Product with Serializable
   object Command {
 
-    final case class JoinChannel(channelName: String, name: String) extends Command
+    final case class JoinChannel(channel: Channel.Name, name: Peer.Name) extends Command
+    final case class SendMessage(to: Peer.Name, message: Message) extends Command
   }
 
-  sealed trait Event
+  sealed trait Event extends Product with Serializable
   object Event {
-    final case class ChannelJoined(channelName: String) extends Event
-    final case class PeerJoined(who: String) extends Event
-    final case class PeerLeft(who: String) extends Event
+    final case class ChannelJoined(channel: Channel.Name, peers: Set[Peer.Name]) extends Event
+    final case class PeerJoined(who: Peer.Name) extends Event
+    final case class PeerLeft(who: Peer.Name) extends Event
+    final case class MessageReceived(from: Peer.Name, message: Message) extends Event
     final case class CommandRejected(reason: String) extends Event
-  }
-
-  // codecs
-  implicit val claimChannelReads: Reads[Command.JoinChannel] = Json.reads[Command.JoinChannel]
-  implicit val reads: Reads[Command] = (json: JsValue) => {
-    json.validate[Command.JoinChannel]
-  }
-
-  private val channelJoinedWrites: Writes[Event.ChannelJoined] = Json.writes[Event.ChannelJoined]
-  private val peerJoinedWrites: Writes[Event.PeerJoined] = Json.writes[Event.PeerJoined]
-  private val peerLeftWrites: Writes[Event.PeerLeft] = Json.writes[Event.PeerLeft]
-  private val commandRejectedWrites: Writes[Event.CommandRejected] = Json.writes[Event.CommandRejected]
-
-  implicit val writes: Writes[Event] = {
-    case obj: Event.ChannelJoined =>
-      Json.obj(
-        "type" -> "channelJoined",
-        "data" -> Json.toJson(obj)(channelJoinedWrites))
-
-    case obj: Event.PeerJoined =>
-      Json.obj(
-        "type" -> "peerJoined",
-        "data" -> Json.toJson(obj)(peerJoinedWrites)
-      )
-
-    case obj: Event.PeerLeft =>
-      Json.obj(
-        "type" -> "peerLeft",
-        "data" -> Json.toJson(obj)(peerLeftWrites)
-      )
-
-    case obj: Event.CommandRejected =>
-      Json.obj(
-        "type" -> "commandRejected",
-        "data" -> Json.toJson(obj)(commandRejectedWrites)
-      )
-  }
-
-  implicit val transformer: WebSocket.MessageFlowTransformer[Command, Event] = {
-    WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer[Command, Event]
   }
 }

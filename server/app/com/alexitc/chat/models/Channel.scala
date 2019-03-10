@@ -1,28 +1,29 @@
 package com.alexitc.chat.models
 
-import akka.actor.ActorRef
-
-case class Channel(participants: Set[Peer]) {
+case class Channel(name: Channel.Name, peers: Set[Peer]) {
 
   def contains(peer: Peer): Boolean = {
-    participants.exists { that =>
+    peers.exists { that =>
       that.ref == peer.ref ||
       that.name == peer.name
     }
   }
 
   def join(who: Peer): Channel = {
-    Channel(participants + who)
+    copy(peers = peers + who)
   }
 
   def leave(who: Peer): Channel = {
-    Channel(participants - who)
+    copy(peers = peers - who)
   }
 }
 
 object Channel {
 
-  val empty: Channel = Channel(Set.empty)
-}
+  def empty(name: Name): Channel = Channel(name, Set.empty)
 
-case class Peer(name: String, ref: ActorRef)
+  // TODO: A channel name must match a regex
+  case class Name(string: String) extends AnyVal {
+    override def toString: String = string
+  }
+}
