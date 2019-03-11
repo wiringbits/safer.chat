@@ -35,3 +35,4 @@ libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.0" % Test
 libraryDependencies += "org.mockito" % "mockito-core" % "2.15.0" % Test
 
+libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % "2.5.21" % Test
