@@ -19,7 +19,7 @@ object HexString {
 
   def from(string: String): Option[HexString] = {
     Try { DatatypeConverter.parseHexBinary(string) }
-        .map(apply)
+        .map(_ => new HexString(string))
         .toOption
   }
 }

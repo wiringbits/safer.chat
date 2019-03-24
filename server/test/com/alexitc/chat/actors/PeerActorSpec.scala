@@ -25,14 +25,13 @@ class PeerActorSpec
 
     val aliceClient = TestProbe()
     val alicePeer = Peer.Simple(Peer.Name("alice"), dummyKey)
-    val alicePeerWithRef = Peer.HasRef(Peer.Name("alice"), dummyKey, aliceClient.ref)
     val alice = system.actorOf(PeerActor.props(aliceClient.ref, channelHandler))
 
     val bobClient = TestProbe()
     val bobPeer = Peer.Simple(Peer.Name("bob"), dummyKey)
     val bob = system.actorOf(PeerActor.props(bobClient.ref, channelHandler))
 
-    val message = Message("hola!")
+    val message = Message.from("hola!")
 
     "allow alice to join" in {
       alice ! PeerActor.Command.JoinChannel(channelName, alicePeer)

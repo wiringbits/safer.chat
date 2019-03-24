@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.alexitc.chat.actors.PeerActor.{Command, Event}
 import com.alexitc.chat.actors.{ChannelHandlerActor, PeerActor}
-import com.alexitc.chat.models.{Channel, HexString, Message, Peer}
+import com.alexitc.chat.models._
 import javax.inject.{Inject, Singleton}
 import play.api.libs.json._
 import play.api.libs.streams.ActorFlow
@@ -57,7 +57,34 @@ object ChannelsController {
     }
   }
 
-  private implicit val messageFormat: Format[Message] = customFormat[Message, String](Message.apply, _.string)
+  private implicit val base64StringFormat: Format[Base64String] = new Format[Base64String] {
+    override def reads(json: JsValue): JsResult[Base64String] = {
+      json
+          .validate[String]
+          .flatMap { string =>
+            Base64String
+                .from(string)
+                .map(JsSuccess(_))
+                .getOrElse(JsError("Invalid base64 string"))
+          }
+    }
+
+    override def writes(o: Base64String): JsValue = {
+      JsString(o.string)
+    }
+  }
+
+  private implicit val messageFormat: Format[Message] = new Format[Message] {
+    override def writes(o: Message): JsValue = {
+      JsString(o.base64.string)
+    }
+
+    override def reads(json: JsValue): JsResult[Message] = {
+      json
+          .validate[Base64String]
+          .map(Message.apply)
+    }
+  }
   private implicit val peerNameFormat: Format[Peer.Name] = customFormat[Peer.Name, String](Peer.Name.apply, _.string)
   private implicit val peerKeyFormat: Format[Peer.Key] = new Format[Peer.Key] {
     override def reads(json: JsValue): JsResult[Peer.Key] = {
