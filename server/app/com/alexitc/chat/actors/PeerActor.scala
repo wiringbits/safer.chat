@@ -47,13 +47,14 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
   def handleChannelHandlerResponse(event: ChannelHandlerActor.Event): Unit = event match {
     case ChannelHandlerActor.Event.ChannelJoined(channel, who) =>
       state = State.OnChannel(who, channel)
-      client ! Event.ChannelJoined(channel.name, channel.peers.map(_.name))
+      val peers: Set[Peer] = channel.peers.collect { case p: Peer => p }
+      client ! Event.ChannelJoined(channel.name, peers)
 
     case ChannelHandlerActor.Event.PeerJoined(who) =>
       state match {
         case x: State.OnChannel =>
           state = x.add(who)
-          client ! Event.PeerJoined(who.name)
+          client ! Event.PeerJoined(who)
 
         case _ => ()
       }
@@ -61,8 +62,8 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
     case ChannelHandlerActor.Event.PeerLeft(who) =>
       state match {
         case x: State.OnChannel =>
-          state = x.remove(who)
-          client ! Event.PeerLeft(who.name)
+          state = x.remove(who.name)
+          client ! Event.PeerLeft(who)
 
         case _ => ()
       }
@@ -79,30 +80,30 @@ object PeerActor {
   sealed trait State
   object State {
     final case object Idle extends State
-    final case class OnChannel(me: Peer.Name, channel: Channel) extends State {
-      def add(peer: Peer): OnChannel = OnChannel(
+    final case class OnChannel(me: Peer, channel: Channel) extends State {
+      def add(peer: Peer.HasRef): OnChannel = OnChannel(
         me,
         channel.copy(peers = channel.peers + peer))
 
-      def remove(peer: Peer): OnChannel = OnChannel(
+      def remove(name: Peer.Name): OnChannel = OnChannel(
         me,
-        channel.copy(peers = channel.peers - peer))
+        channel.copy(peers = channel.peers.filter(_.name != name)))
     }
   }
 
   sealed trait Command extends Product with Serializable
   object Command {
 
-    final case class JoinChannel(channel: Channel.Name, name: Peer.Name) extends Command
+    final case class JoinChannel(channel: Channel.Name, name: Peer) extends Command
     final case class SendMessage(to: Peer.Name, message: Message) extends Command
   }
 
   sealed trait Event extends Product with Serializable
   object Event {
-    final case class ChannelJoined(channel: Channel.Name, peers: Set[Peer.Name]) extends Event
-    final case class PeerJoined(who: Peer.Name) extends Event
-    final case class PeerLeft(who: Peer.Name) extends Event
-    final case class MessageReceived(from: Peer.Name, message: Message) extends Event
+    final case class ChannelJoined(channel: Channel.Name, peers: Set[Peer]) extends Event
+    final case class PeerJoined(who: Peer) extends Event
+    final case class PeerLeft(who: Peer) extends Event
+    final case class MessageReceived(from: Peer, message: Message) extends Event
     final case class CommandRejected(reason: String) extends Event
   }
 }

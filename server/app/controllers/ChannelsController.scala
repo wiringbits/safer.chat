@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.alexitc.chat.actors.PeerActor.{Command, Event}
 import com.alexitc.chat.actors.{ChannelHandlerActor, PeerActor}
-import com.alexitc.chat.models.{Channel, Message, Peer}
+import com.alexitc.chat.models.{Channel, HexString, Message, Peer}
 import javax.inject.{Inject, Singleton}
 import play.api.libs.json._
 import play.api.libs.streams.ActorFlow
@@ -40,9 +40,58 @@ object ChannelsController {
     }
   }
 
+  private implicit val hexStringFormat: Format[HexString] = new Format[HexString] {
+    override def reads(json: JsValue): JsResult[HexString] = {
+      json
+          .validate[String]
+          .flatMap { string =>
+            HexString
+                .from(string)
+                .map(JsSuccess(_))
+                .getOrElse(JsError("Invalid hex string"))
+          }
+    }
+
+    override def writes(o: HexString): JsValue = {
+      JsString(o.string)
+    }
+  }
+
   private implicit val messageFormat: Format[Message] = customFormat[Message, String](Message.apply, _.string)
   private implicit val peerNameFormat: Format[Peer.Name] = customFormat[Peer.Name, String](Peer.Name.apply, _.string)
+  private implicit val peerKeyFormat: Format[Peer.Key] = new Format[Peer.Key] {
+    override def reads(json: JsValue): JsResult[Peer.Key] = {
+      json
+          .validate[HexString]
+          .flatMap { hex =>
+            Peer.Key.from(hex)
+                .map(JsSuccess(_))
+                .getOrElse(JsError("Invalid public key"))
+          }
+    }
+
+    override def writes(o: Peer.Key): JsValue = {
+      Json.toJson(o.encoded)
+    }
+  }
+
   private implicit val channelNameFormat: Format[Channel.Name] = customFormat[Channel.Name, String](Channel.Name.apply, _.string)
+
+  private implicit val peerFormat: Format[Peer] = new Format[Peer] {
+    override def reads(json: JsValue): JsResult[Peer] = {
+      for {
+        name <- (json \ "name").validate[Peer.Name]
+        key <- (json \ "key").validate[Peer.Key]
+      } yield Peer.Simple(name, key)
+    }
+
+    override def writes(o: Peer): JsValue = {
+      Json.obj(
+        "name" -> o.name,
+        "key" -> o.key
+      )
+    }
+  }
 
   private val joinChannelReads: Reads[Command.JoinChannel] = Json.reads[Command.JoinChannel]
   private val sendMessageReads: Reads[Command.SendMessage] = Json.reads[Command.SendMessage]

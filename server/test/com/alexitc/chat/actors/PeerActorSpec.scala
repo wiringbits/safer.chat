@@ -2,7 +2,7 @@ package com.alexitc.chat.actors
 
 import akka.actor.{ActorSystem, PoisonPill}
 import akka.testkit.{TestKit, TestProbe}
-import com.alexitc.chat.models.{Channel, Message, Peer}
+import com.alexitc.chat.models.{Channel, KeyPairs, Message, Peer}
 import org.scalatest.MustMatchers._
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
 
@@ -16,6 +16,7 @@ class PeerActorSpec
   }
 
   "the chat" must {
+    val dummyKey = Peer.Key(KeyPairs.generate().getPublic)
     val channelHandler: ChannelHandlerActor.Ref = ChannelHandlerActor.Ref(
       system.actorOf(ChannelHandlerActor.props, "channel-handler")
     )
@@ -23,42 +24,43 @@ class PeerActorSpec
     val channelName = Channel.Name("test-channel")
 
     val aliceClient = TestProbe()
-    val aliceName = Peer.Name("alice")
+    val alicePeer = Peer.Simple(Peer.Name("alice"), dummyKey)
+    val alicePeerWithRef = Peer.HasRef(Peer.Name("alice"), dummyKey, aliceClient.ref)
     val alice = system.actorOf(PeerActor.props(aliceClient.ref, channelHandler))
 
     val bobClient = TestProbe()
-    val bobName = Peer.Name("bob")
+    val bobPeer = Peer.Simple(Peer.Name("bob"), dummyKey)
     val bob = system.actorOf(PeerActor.props(bobClient.ref, channelHandler))
 
     val message = Message("hola!")
 
     "allow alice to join" in {
-      alice ! PeerActor.Command.JoinChannel(channelName, aliceName)
+      alice ! PeerActor.Command.JoinChannel(channelName, alicePeer)
       aliceClient.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set.empty))
     }
 
     "allow bob to join" in {
-      bob ! PeerActor.Command.JoinChannel(channelName, bobName)
-      bobClient.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set(aliceName)))
+      bob ! PeerActor.Command.JoinChannel(channelName, bobPeer)
+      bobClient.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set(alicePeer)))
     }
 
     "notify alice that bob has joined" in {
-      aliceClient.expectMsg(PeerActor.Event.PeerJoined(bobName))
+      aliceClient.expectMsg(PeerActor.Event.PeerJoined(bobPeer))
     }
 
     "allow alice to send a message to bob" in {
-      alice ! PeerActor.Command.SendMessage(bobName, message)
-      bobClient.expectMsg(PeerActor.Event.MessageReceived(aliceName, message))
+      alice ! PeerActor.Command.SendMessage(bobPeer.name, message)
+      bobClient.expectMsg(PeerActor.Event.MessageReceived(alicePeer, message))
     }
 
     "allow bob to send a message to alice" in {
-      bob ! PeerActor.Command.SendMessage(aliceName, message)
-      aliceClient.expectMsg(PeerActor.Event.MessageReceived(bobName, message))
+      bob ! PeerActor.Command.SendMessage(alicePeer.name, message)
+      aliceClient.expectMsg(PeerActor.Event.MessageReceived(bobPeer, message))
     }
 
     "notify bob when alice leaves" in {
       alice ! PoisonPill
-      bobClient.expectMsg(PeerActor.Event.PeerLeft(aliceName))
+      bobClient.expectMsg(PeerActor.Event.PeerLeft(alicePeer))
     }
   }
 }

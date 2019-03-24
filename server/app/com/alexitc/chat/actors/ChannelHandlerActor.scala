@@ -10,8 +10,8 @@ class ChannelHandlerActor extends Actor {
   private var channels: Map[Channel.Name, Channel] = Map.empty
 
   override def receive: Receive = {
-    case Command.JoinChannel(channelName, peerName) =>
-      val who = Peer(peerName, sender())
+    case Command.JoinChannel(channelName, peer) =>
+      val who = peer.withRef(sender())
       val channel = getOrCreate(channelName)
       joinChannel(who, channel)
 
@@ -31,7 +31,7 @@ class ChannelHandlerActor extends Actor {
     channels = channels.updated(channel.name, channel)
   }
 
-  private def notifyPeerJoined(channel: Channel, who: Peer): Unit = {
+  private def notifyPeerJoined(channel: Channel, who: Peer.HasRef): Unit = {
     val event = Event.PeerJoined(who)
     notify(channel, who, event)
   }
@@ -48,7 +48,7 @@ class ChannelHandlerActor extends Actor {
         .foreach(_.ref ! event)
   }
 
-  private def joinChannel(who: Peer, channel: Channel): Unit = {
+  private def joinChannel(who: Peer.HasRef, channel: Channel): Unit = {
     println(s"a peer with name=${who.name} is trying to join channel=${channel.name}")
 
     if (channel.contains(who)) {
@@ -62,11 +62,11 @@ class ChannelHandlerActor extends Actor {
       update(newChannel)
       notifyPeerJoined(channel, who)
 
-      who.ref ! Event.ChannelJoined(channel, who.name)
+      who.ref ! Event.ChannelJoined(channel, who)
     }
   }
 
-  private def leaveChannel(who: Peer, channel: Channel): Unit = {
+  private def leaveChannel(who: Peer.HasRef, channel: Channel): Unit = {
     println(s"${who.name} is leaving ${channel.name}")
 
     val newChannel = channel.leave(who)
@@ -83,14 +83,14 @@ object ChannelHandlerActor {
 
   sealed trait Command extends Product with Serializable
   object Command {
-    final case class JoinChannel(channel: Channel.Name, who: Peer.Name) extends Command
+    final case class JoinChannel(channel: Channel.Name, who: Peer) extends Command
     final case class LeaveChannel(channel: Channel.Name) extends Command
   }
 
   sealed trait Event extends Product with Serializable
   object Event {
-    final case class ChannelJoined(channel: Channel, who: Peer.Name) extends Event
-    final case class PeerJoined(peer: Peer) extends Event
+    final case class ChannelJoined(channel: Channel, who: Peer) extends Event
+    final case class PeerJoined(peer: Peer.HasRef) extends Event
     final case class PeerLeft(peer: Peer) extends Event
     final case class PeerRejected(reason: String) extends Event
   }

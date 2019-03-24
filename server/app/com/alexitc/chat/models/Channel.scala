@@ -1,19 +1,19 @@
 package com.alexitc.chat.models
 
-case class Channel(name: Channel.Name, peers: Set[Peer]) {
+case class Channel(name: Channel.Name, peers: Set[Peer.HasRef]) {
 
-  def contains(peer: Peer): Boolean = {
+  def contains(peer: Peer.HasRef): Boolean = {
     peers.exists { that =>
       that.ref == peer.ref ||
       that.name == peer.name
     }
   }
 
-  def join(who: Peer): Channel = {
+  def join(who: Peer.HasRef): Channel = {
     copy(peers = peers + who)
   }
 
-  def leave(who: Peer): Channel = {
+  def leave(who: Peer.HasRef): Channel = {
     copy(peers = peers - who)
   }
 }
