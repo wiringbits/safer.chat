@@ -10,12 +10,9 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
   private var state: State = State.Idle
 
   private def leaveCurrentChannel(): Unit = {
-    state match {
-      case State.OnChannel(_, channel) =>
-        channelHandler.actor ! ChannelHandlerActor.Command.LeaveChannel(channel.name)
-        state = State.Idle
-
-      case _ => ()
+    withOnChannelState { s =>
+      channelHandler.actor ! ChannelHandlerActor.Command.LeaveChannel(s.channel.name)
+      state = State.Idle
     }
   }
 
@@ -29,14 +26,11 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
       channelHandler.actor ! ChannelHandlerActor.Command.JoinChannel(channelName, name)
 
     case Command.SendMessage(to, message) =>
-      state match {
-        case s: State.OnChannel =>
-          val peerMaybe = s.channel.peers.find(_.name == to)
-          peerMaybe.foreach { peer =>
-            peer.ref ! Event.MessageReceived(s.me, message)
-          }
-
-        case _ => ()
+      withOnChannelState { s =>
+        val peerMaybe = s.channel.peers.find(_.name == to)
+        peerMaybe.foreach { peer =>
+          peer.ref ! Event.MessageReceived(s.me, message)
+        }
       }
 
     case msg: Event => client ! msg
@@ -51,25 +45,26 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
       client ! Event.ChannelJoined(channel.name, peers)
 
     case ChannelHandlerActor.Event.PeerJoined(who) =>
-      state match {
-        case x: State.OnChannel =>
-          state = x.add(who)
-          client ! Event.PeerJoined(who)
-
-        case _ => ()
+      withOnChannelState { s =>
+        state = s.add(who)
+        client ! Event.PeerJoined(who)
       }
 
     case ChannelHandlerActor.Event.PeerLeft(who) =>
-      state match {
-        case x: State.OnChannel =>
-          state = x.remove(who.name)
-          client ! Event.PeerLeft(who)
-
-        case _ => ()
+      withOnChannelState { s =>
+        state = s.remove(who.name)
+        client ! Event.PeerLeft(who)
       }
 
     case ChannelHandlerActor.Event.PeerRejected(reason) =>
       client ! Event.CommandRejected(reason)
+  }
+
+  private def withOnChannelState(f: State.OnChannel => Unit): Unit = {
+    state match {
+      case state: State.OnChannel => f(state)
+      case _ => ()
+    }
   }
 }
 
