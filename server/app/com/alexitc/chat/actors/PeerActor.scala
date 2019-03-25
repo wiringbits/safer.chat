@@ -21,9 +21,9 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
   }
 
   override def receive: Receive = {
-    case Command.JoinChannel(channelName, name) =>
+    case Command.JoinChannel(channelName, secret, name) =>
       leaveCurrentChannel()
-      channelHandler.actor ! ChannelHandlerActor.Command.JoinChannel(channelName, name)
+      channelHandler.actor ! ChannelHandlerActor.Command.JoinChannel(channelName, secret, name)
 
     case Command.SendMessage(to, message) =>
       withOnChannelState { s =>
@@ -89,7 +89,7 @@ object PeerActor {
   sealed trait Command extends Product with Serializable
   object Command {
 
-    final case class JoinChannel(channel: Channel.Name, name: Peer) extends Command
+    final case class JoinChannel(channel: Channel.Name, secret: Channel.Secret, name: Peer) extends Command
     final case class SendMessage(to: Peer.Name, message: Message) extends Command
   }
 

@@ -26,6 +26,7 @@ class PeerActorSpec
     )
 
     val channelName = Channel.Name("test-channel")
+    val channelSecret = Channel.Secret("dummy-secret")
 
     val aliceClient = TestProbe()
     val alicePeer = Peer.Simple(Peer.Name("alice"), Peer.Key(aliceKeys.getPublic))
@@ -35,13 +36,18 @@ class PeerActorSpec
     val bobPeer = Peer.Simple(Peer.Name("bob"), Peer.Key(bobKeys.getPublic))
     val bob = system.actorOf(PeerActor.props(bobClient.ref, channelHandler))
 
-    "allow alice to join" in {
-      alice ! PeerActor.Command.JoinChannel(channelName, alicePeer)
+    "allow alice to create the channel" in {
+      alice ! PeerActor.Command.JoinChannel(channelName, channelSecret, alicePeer)
       aliceClient.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set.empty))
     }
 
+    "reject bob due to wrong secret" in {
+      bob ! PeerActor.Command.JoinChannel(channelName, Channel.Secret("what?"), bobPeer)
+      bobClient.expectMsg(PeerActor.Event.CommandRejected("The secret or the channel is incorrect"))
+    }
+
     "allow bob to join" in {
-      bob ! PeerActor.Command.JoinChannel(channelName, bobPeer)
+      bob ! PeerActor.Command.JoinChannel(channelName, channelSecret, bobPeer)
       bobClient.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set(alicePeer)))
     }
 

@@ -10,21 +10,31 @@ class ChannelHandlerActor extends Actor {
   private var channels: Map[Channel.Name, Channel] = Map.empty
 
   override def receive: Receive = {
-    case Command.JoinChannel(channelName, peer) =>
+    case Command.JoinChannel(name, secret, peer) =>
       val who = peer.withRef(sender())
-      val channel = getOrCreate(channelName)
-      joinChannel(who, channel)
+      val channel = getOrCreate(name, secret)
+      if (channel.secret == secret) {
+        joinChannel(who, channel)
+      } else {
+        who.ref ! Event.PeerRejected("The secret or the channel is incorrect")
+      }
 
     case Command.LeaveChannel(channelName) =>
       val whoRef = sender()
-      val channel = getOrCreate(channelName)
-      val whoMaybe = channel.peers.find(_.ref == whoRef)
-
-      whoMaybe.foreach { leaveChannel(_, channel) }
+      for {
+        channel <- get(channelName)
+        who <- channel.peers.find(_.ref == whoRef)
+      } {
+        leaveChannel(who, channel)
+      }
   }
 
-  private def getOrCreate(name: Channel.Name): Channel = {
-    channels.getOrElse(name, Channel.empty(name))
+  private def get(name: Channel.Name): Option[Channel] = {
+    channels.get(name)
+  }
+
+  private def getOrCreate(name: Channel.Name, secret: Channel.Secret): Channel = {
+    channels.getOrElse(name, Channel.empty(name, secret))
   }
 
   private def update(channel: Channel): Unit = {
@@ -83,7 +93,7 @@ object ChannelHandlerActor {
 
   sealed trait Command extends Product with Serializable
   object Command {
-    final case class JoinChannel(channel: Channel.Name, who: Peer) extends Command
+    final case class JoinChannel(channel: Channel.Name, secret: Channel.Secret, who: Peer) extends Command
     final case class LeaveChannel(channel: Channel.Name) extends Command
   }
 

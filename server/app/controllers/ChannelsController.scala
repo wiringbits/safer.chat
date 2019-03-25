@@ -103,6 +103,7 @@ object ChannelsController {
   }
 
   private implicit val channelNameFormat: Format[Channel.Name] = customFormat[Channel.Name, String](Channel.Name.apply, _.string)
+  private implicit val channelSecretFormat: Format[Channel.Secret] = customFormat[Channel.Secret, String](Channel.Secret.apply, _.string)
 
   private implicit val peerFormat: Format[Peer] = new Format[Peer] {
     override def reads(json: JsValue): JsResult[Peer] = {
