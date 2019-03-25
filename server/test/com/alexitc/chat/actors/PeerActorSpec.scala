@@ -19,19 +19,24 @@ class PeerActorSpec
   }
 
   "the chat" must {
-    val aliceKeys = KeyPairs.generate()
-    val bobKeys = KeyPairs.generate()
+    val config = ChannelHandlerActor.Config(
+      maxPeersOnChannel = 2,
+      supportEmail = "support@hidden.chat"
+    )
+
     val channelHandler: ChannelHandlerActor.Ref = ChannelHandlerActor.Ref(
-      system.actorOf(ChannelHandlerActor.props, "channel-handler")
+      system.actorOf(ChannelHandlerActor.props(config), "channel-handler")
     )
 
     val channelName = Channel.Name("test-channel")
     val channelSecret = Channel.Secret("dummy-secret")
 
+    val aliceKeys = KeyPairs.generate()
     val aliceClient = TestProbe()
     val alicePeer = Peer.Simple(Peer.Name("alice"), Peer.Key(aliceKeys.getPublic))
     val alice = system.actorOf(PeerActor.props(aliceClient.ref, channelHandler))
 
+    val bobKeys = KeyPairs.generate()
     val bobClient = TestProbe()
     val bobPeer = Peer.Simple(Peer.Name("bob"), Peer.Key(bobKeys.getPublic))
     val bob = system.actorOf(PeerActor.props(bobClient.ref, channelHandler))
@@ -49,6 +54,15 @@ class PeerActorSpec
     "allow bob to join" in {
       bob ! PeerActor.Command.JoinChannel(channelName, channelSecret, bobPeer)
       bobClient.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set(alicePeer)))
+    }
+
+    val carlosKeys = KeyPairs.generate()
+    val carlosClient = TestProbe()
+    val carlosPeer = Peer.Simple(Peer.Name("carlos"), Peer.Key(carlosKeys.getPublic))
+    val carlos = system.actorOf(PeerActor.props(carlosClient.ref, channelHandler))
+    "reject carlos due to channel being full" in {
+      carlos ! PeerActor.Command.JoinChannel(channelName, channelSecret, carlosPeer)
+      carlosClient.expectMsg(PeerActor.Event.CommandRejected("The channel is full, if you need bigger channels, write us to support@hidden.chat"))
     }
 
     "notify alice that bob has joined" in {

@@ -15,8 +15,13 @@ class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: A
 
   import ChannelsController._
 
-  val channelHandler: ChannelHandlerActor.Ref = ChannelHandlerActor.Ref(
-    system.actorOf(ChannelHandlerActor.props, "channel-handler")
+  private val channelConfig = ChannelHandlerActor.Config(
+    maxPeersOnChannel = 4,
+    supportEmail = "support@hidden.chat"
+  )
+
+  private val channelHandler: ChannelHandlerActor.Ref = ChannelHandlerActor.Ref(
+    system.actorOf(ChannelHandlerActor.props(channelConfig), "channel-handler")
   )
 
   def ws() = WebSocket.accept[PeerActor.Command, PeerActor.Event] { _ =>

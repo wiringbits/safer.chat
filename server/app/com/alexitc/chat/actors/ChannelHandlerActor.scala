@@ -3,7 +3,7 @@ package com.alexitc.chat.actors
 import akka.actor.{Actor, ActorRef, Props}
 import com.alexitc.chat.models.{Channel, Peer}
 
-class ChannelHandlerActor extends Actor {
+class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
 
   import ChannelHandlerActor._
 
@@ -13,7 +13,9 @@ class ChannelHandlerActor extends Actor {
     case Command.JoinChannel(name, secret, peer) =>
       val who = peer.withRef(sender())
       val channel = getOrCreate(name, secret)
-      if (channel.secret == secret) {
+      if (channel.peers.size >= config.maxPeersOnChannel) {
+        who.ref ! Event.PeerRejected(s"The channel is full, if you need bigger channels, write us to ${config.supportEmail}")
+      } else if (channel.secret == secret) {
         joinChannel(who, channel)
       } else {
         who.ref ! Event.PeerRejected("The secret or the channel is incorrect")
@@ -87,9 +89,13 @@ class ChannelHandlerActor extends Actor {
 
 object ChannelHandlerActor {
 
-  def props: Props = Props(new ChannelHandlerActor)
+  def props(config: Config): Props = Props(new ChannelHandlerActor(config))
 
   case class Ref(actor: ActorRef) extends AnyVal
+  case class Config(
+      maxPeersOnChannel: Int,
+      supportEmail: String
+  )
 
   sealed trait Command extends Product with Serializable
   object Command {
