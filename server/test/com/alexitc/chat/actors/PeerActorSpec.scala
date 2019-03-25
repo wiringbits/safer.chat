@@ -1,8 +1,8 @@
 package com.alexitc.chat.actors
 
-import java.security.{PrivateKey, PublicKey}
+import java.security.{KeyPair, PrivateKey, PublicKey}
 
-import akka.actor.{ActorSystem, PoisonPill}
+import akka.actor.{ActorRef, ActorSystem, PoisonPill}
 import akka.testkit.{TestKit, TestProbe}
 import com.alexitc.chat.models._
 import javax.crypto.Cipher
@@ -13,6 +13,8 @@ class PeerActorSpec
     extends TestKit(ActorSystem("PeerActorSpec"))
         with WordSpecLike
         with BeforeAndAfterAll {
+
+  import PeerActorSpec._
 
   override def afterAll: Unit = {
     TestKit.shutdownActorSystem(system)
@@ -31,64 +33,54 @@ class PeerActorSpec
     val channelName = Channel.Name("test-channel")
     val channelSecret = Channel.Secret("dummy-secret")
 
-    val aliceKeys = KeyPairs.generate()
-    val aliceClient = TestProbe()
-    val alicePeer = Peer.Simple(Peer.Name("alice"), Peer.Key(aliceKeys.getPublic))
-    val alice = system.actorOf(PeerActor.props(aliceClient.ref, channelHandler))
-
-    val bobKeys = KeyPairs.generate()
-    val bobClient = TestProbe()
-    val bobPeer = Peer.Simple(Peer.Name("bob"), Peer.Key(bobKeys.getPublic))
-    val bob = system.actorOf(PeerActor.props(bobClient.ref, channelHandler))
+    val alice = TestPeer("alice", channelHandler)
+    val bob = TestPeer("bob", channelHandler)
+    val carlos = TestPeer("carlos", channelHandler)
 
     "allow alice to create the channel" in {
-      alice ! PeerActor.Command.JoinChannel(channelName, channelSecret, alicePeer)
-      aliceClient.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set.empty))
+      alice.actor ! PeerActor.Command.JoinChannel(channelName, channelSecret, alice.peer)
+      alice.client.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set.empty))
     }
 
     "reject bob due to wrong secret" in {
-      bob ! PeerActor.Command.JoinChannel(channelName, Channel.Secret("what?"), bobPeer)
-      bobClient.expectMsg(PeerActor.Event.CommandRejected("The secret or the channel is incorrect"))
+      bob.actor ! PeerActor.Command.JoinChannel(channelName, Channel.Secret("what?"), bob.peer)
+      bob.client.expectMsg(PeerActor.Event.CommandRejected("The secret or the channel is incorrect"))
     }
 
     "allow bob to join" in {
-      bob ! PeerActor.Command.JoinChannel(channelName, channelSecret, bobPeer)
-      bobClient.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set(alicePeer)))
+      bob.actor ! PeerActor.Command.JoinChannel(channelName, channelSecret, bob.peer)
+      bob.client.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set(alice.peer)))
     }
 
-    val carlosKeys = KeyPairs.generate()
-    val carlosClient = TestProbe()
-    val carlosPeer = Peer.Simple(Peer.Name("carlos"), Peer.Key(carlosKeys.getPublic))
-    val carlos = system.actorOf(PeerActor.props(carlosClient.ref, channelHandler))
     "reject carlos due to channel being full" in {
-      carlos ! PeerActor.Command.JoinChannel(channelName, channelSecret, carlosPeer)
-      carlosClient.expectMsg(PeerActor.Event.CommandRejected("The channel is full, if you need bigger channels, write us to support@hidden.chat"))
+      carlos.actor ! PeerActor.Command.JoinChannel(channelName, channelSecret, carlos.peer)
+      carlos.client.expectMsg(PeerActor.Event.CommandRejected("The channel is full, if you need bigger channels, write us to support@hidden.chat"))
     }
 
     "notify alice that bob has joined" in {
-      aliceClient.expectMsg(PeerActor.Event.PeerJoined(bobPeer))
+      alice.client.expectMsg(PeerActor.Event.PeerJoined(bob.peer))
     }
 
     val plainTextMessage = "hola!"
-    val message = Message(Base64String.apply(encrypt(bobKeys.getPublic, plainTextMessage)))
+    val message = Message(Base64String.apply(encrypt(bob.keys.getPublic, plainTextMessage)))
     "allow alice to send a message to bob encrypting it with bob's key" in {
-      alice ! PeerActor.Command.SendMessage(bobPeer.name, message)
-      bobClient.expectMsg(PeerActor.Event.MessageReceived(alicePeer, message))
+      alice.actor ! PeerActor.Command.SendMessage(bob.peer.name, message)
+      bob.client.expectMsg(PeerActor.Event.MessageReceived(alice.peer, message))
     }
 
     "allow bob to send a message to alice" in {
-      bob ! PeerActor.Command.SendMessage(alicePeer.name, message)
-      aliceClient.expectMsg(PeerActor.Event.MessageReceived(bobPeer, message))
+      bob.actor ! PeerActor.Command.SendMessage(alice.peer.name, message)
+      alice.client.expectMsg(PeerActor.Event.MessageReceived(bob.peer, message))
     }
 
     "allow bob to decrypt the message from alice" in {
-      val text = decrypt(bobKeys.getPrivate, message.base64.bytes)
+      val text = decrypt(bob.keys.getPrivate, message.base64.bytes)
       text must be(plainTextMessage)
     }
 
     "notify bob when alice leaves" in {
-      alice ! PoisonPill
-      bobClient.expectMsg(PeerActor.Event.PeerLeft(alicePeer))
+      alice.actor ! PoisonPill
+      bob.client.expectMsg(PeerActor.Event.PeerLeft(alice.peer))
     }
   }
 
@@ -106,5 +98,22 @@ class PeerActorSpec
     val bytes = cipher.doFinal(message)
     new String(bytes)
   }
+}
 
+object PeerActorSpec {
+  case class TestPeer(
+      keys: KeyPair,
+      client: TestProbe,
+      peer: Peer,
+      actor: ActorRef)
+
+  object TestPeer {
+    def apply(name: String, channelHandler: ChannelHandlerActor.Ref)(implicit system: ActorSystem): TestPeer = {
+      val keys = KeyPairs.generate()
+      val client = TestProbe()
+      val peer = Peer.Simple(Peer.Name(name), Peer.Key(keys.getPublic))
+      val actor = system.actorOf(PeerActor.props(client.ref, channelHandler))
+      TestPeer(keys, client, peer, actor)
+    }
+  }
 }
