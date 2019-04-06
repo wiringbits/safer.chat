@@ -7,16 +7,26 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
 
   import ChannelHandlerActor._
 
-  private var channels: Map[Channel.Name, Channel] = Map.empty
+  override def preStart(): Unit = {
+    context become withChannelsState(Map.empty)
+  }
 
   override def receive: Receive = {
+    case msg => println(s"receive - unexpected message: $msg")
+  }
+
+  private def withChannelsState(channels: State): Receive = {
     case Command.JoinChannel(name, secret, peer) =>
       val who = peer.withRef(sender())
-      val channel = getOrCreate(name, secret)
+      val channel = channels.getOrElse(name, Channel.empty(name, secret))
       if (channel.peers.size >= config.maxPeersOnChannel) {
         who.ref ! Event.PeerRejected(s"The channel is full, if you need bigger channels, write us to ${config.supportEmail}")
       } else if (channel.secret == secret) {
-        joinChannel(who, channel)
+        for {
+          newState <- joinChannelUnsafe(channels, who, channel)
+        } {
+          context become withChannelsState(newState)
+        }
       } else {
         who.ref ! Event.PeerRejected("The secret or the channel is incorrect")
       }
@@ -28,20 +38,36 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
         channel <- channels.values
         who <- channel.peers.find(_.ref == whoRef)
       } {
-        leaveChannel(who, channel)
+        val newState = leaveChannelUnsafe(channels, who, channel)
+        context become withChannelsState(newState)
       }
   }
 
-  private def get(name: Channel.Name): Option[Channel] = {
-    channels.get(name)
+  private def leaveChannelUnsafe(channels: State, who: Peer.HasRef, channel: Channel): State = {
+    println(s"${who.name} is leaving ${channel.name}")
+
+    // is important to notify the peer that is leaving
+    notifyPeerLeft(channel, who)
+
+    val newChannel = channel.leave(who)
+    channels.updated(channel.name, newChannel)
   }
 
-  private def getOrCreate(name: Channel.Name, secret: Channel.Secret): Channel = {
-    channels.getOrElse(name, Channel.empty(name, secret))
-  }
+  private def joinChannelUnsafe(channels: State, who: Peer.HasRef, channel: Channel): Option[State] = {
+    println(s"a peer with name=${who.name} is trying to join channel=${channel.name}")
+    joinChannel(who, channel) match {
+      case Left(rejectionEvent) =>
+        println(s"rejecting command, name=${who.name}, reason = ${rejectionEvent.reason}")
+        who.ref ! rejectionEvent
+        None
 
-  private def update(channel: Channel): Unit = {
-    channels = channels.updated(channel.name, channel)
+      case Right(newChannel) =>
+        println(s"${who.name} has joined ${channel.name}")
+        val newState = channels.updated(channel.name, newChannel)
+        notifyPeerJoined(channel, who)
+        who.ref ! Event.ChannelJoined(channel, who)
+        Some(newState)
+    }
   }
 
   private def notifyPeerJoined(channel: Channel, who: Peer.HasRef): Unit = {
@@ -61,38 +87,21 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
         .foreach(_.ref ! event)
   }
 
-  private def joinChannel(who: Peer.HasRef, channel: Channel): Unit = {
-    println(s"a peer with name=${who.name} is trying to join channel=${channel.name}")
-
+  private def joinChannel(who: Peer.HasRef, channel: Channel): Either[Event.PeerRejected, Channel] = {
     if (channel.contains(who)) {
-      println(s"rejecting command, name=${who.name} already taken on channel=${channel.name}")
-
-      who.ref ! Event.PeerRejected("The name is already taken")
+      Left(Event.PeerRejected("The name is already taken"))
     } else {
-      println(s"${who.name} has joined ${channel.name}")
-
       val newChannel = channel.join(who)
-      update(newChannel)
-      notifyPeerJoined(channel, who)
-
-      who.ref ! Event.ChannelJoined(channel, who)
+      Right(newChannel)
     }
-  }
-
-  private def leaveChannel(who: Peer.HasRef, channel: Channel): Unit = {
-    println(s"${who.name} is leaving ${channel.name}")
-
-    // is important to notify the peer that is leaving
-    notifyPeerLeft(channel, who)
-
-    val newChannel = channel.leave(who)
-    update(newChannel)
   }
 }
 
 object ChannelHandlerActor {
 
   def props(config: Config): Props = Props(new ChannelHandlerActor(config))
+
+  type State = Map[Channel.Name, Channel]
 
   case class Ref(actor: ActorRef) extends AnyVal
   case class Config(
