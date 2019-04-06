@@ -21,10 +21,11 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
         who.ref ! Event.PeerRejected("The secret or the channel is incorrect")
       }
 
-    case Command.LeaveChannel(channelName) =>
+    // a peer can belong to a single channel, find where it is and remove it
+    case Command.LeaveChannel =>
       val whoRef = sender()
       for {
-        channel <- get(channelName)
+        channel <- channels.values
         who <- channel.peers.find(_.ref == whoRef)
       } {
         leaveChannel(who, channel)
@@ -81,9 +82,11 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
   private def leaveChannel(who: Peer.HasRef, channel: Channel): Unit = {
     println(s"${who.name} is leaving ${channel.name}")
 
+    // is important to notify the peer that is leaving
+    notifyPeerLeft(channel, who)
+
     val newChannel = channel.leave(who)
     update(newChannel)
-    notifyPeerLeft(channel, who)
   }
 }
 
@@ -100,7 +103,7 @@ object ChannelHandlerActor {
   sealed trait Command extends Product with Serializable
   object Command {
     final case class JoinChannel(channel: Channel.Name, secret: Channel.Secret, who: Peer) extends Command
-    final case class LeaveChannel(channel: Channel.Name) extends Command
+    final case object LeaveChannel extends Command
   }
 
   sealed trait Event extends Product with Serializable

@@ -1,70 +1,87 @@
 package com.alexitc.chat.actors
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import com.alexitc.chat.models.{Channel, Message, Peer}
 
-class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) extends Actor {
+class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) extends Actor with ActorLogging {
 
   import PeerActor._
 
-  private var state: State = State.Idle
-
-  private def leaveCurrentChannel(): Unit = {
-    withOnChannelState { s =>
-      channelHandler.actor ! ChannelHandlerActor.Command.LeaveChannel(s.channel.name)
-      state = State.Idle
-    }
+  override def preStart(): Unit = {
+    context become onIdleState
   }
 
   override def postStop(): Unit = {
     leaveCurrentChannel()
   }
 
-  override def receive: Receive = {
+  private def leaveCurrentChannel(): Unit = {
+    channelHandler.actor ! ChannelHandlerActor.Command.LeaveChannel
+  }
+
+  /**
+   * When the client connects, it is in the idle state.
+   *
+   * Then, the client is only able to join a channel.
+   */
+  private def onIdleState: Receive = {
+    // The client is trying to join a channel, the channel manager must confirm that it can join.
     case Command.JoinChannel(channelName, secret, name) =>
-      leaveCurrentChannel()
       channelHandler.actor ! ChannelHandlerActor.Command.JoinChannel(channelName, secret, name)
 
-    case Command.SendMessage(to, message) =>
-      withOnChannelState { s =>
-        val peerMaybe = s.channel.peers.find(_.name == to)
-        peerMaybe.foreach { peer =>
-          peer.ref ! Event.MessageReceived(s.me, message)
-        }
-      }
-
-    case msg: Event => client ! msg
-    case msg: ChannelHandlerActor.Event => handleChannelHandlerResponse(msg)
-    case x => println(s"Unexpected message: $x")
-  }
-
-  def handleChannelHandlerResponse(event: ChannelHandlerActor.Event): Unit = event match {
+    // The channel manager has allowed the client to join the channel
     case ChannelHandlerActor.Event.ChannelJoined(channel, who) =>
-      state = State.OnChannel(who, channel)
+      val state = State.OnChannel(who, channel)
       val peers: Set[Peer] = channel.peers.collect { case p: Peer => p }
       client ! Event.ChannelJoined(channel.name, peers)
+      context become onChannelState(state)
 
-    case ChannelHandlerActor.Event.PeerJoined(who) =>
-      withOnChannelState { s =>
-        state = s.add(who)
-        client ! Event.PeerJoined(who)
-      }
-
-    case ChannelHandlerActor.Event.PeerLeft(who) =>
-      withOnChannelState { s =>
-        state = s.remove(who.name)
-        client ! Event.PeerLeft(who)
-      }
-
+    // The channel manager isn't allowing the client to join
     case ChannelHandlerActor.Event.PeerRejected(reason) =>
       client ! Event.CommandRejected(reason)
+
+    case msg => log.info(s"onIdleState - unexpected message: $msg")
   }
 
-  private def withOnChannelState(f: State.OnChannel => Unit): Unit = {
-    state match {
-      case state: State.OnChannel => f(state)
-      case _ => ()
-    }
+  /**
+   * The client is already participating in a channel.
+   */
+  private def onChannelState(state: State.OnChannel): Receive = {
+    // The client can send a message directly to another peer
+    case Command.SendMessage(to, message) =>
+      val peerMaybe = state.channel.peers.find(_.name == to)
+      peerMaybe.foreach { peer =>
+        log.info(s"Send message to ${peer.name}")
+        peer.ref ! Event.MessageReceived(state.me, message)
+      }
+
+    // The channel manager tells the client that another peer has joined
+    case ChannelHandlerActor.Event.PeerJoined(who) =>
+      val newState = state.add(who)
+      client ! Event.PeerJoined(who)
+      context become onChannelState(newState)
+
+    // The channel manager confirms me that I have left the channel
+    case ChannelHandlerActor.Event.PeerLeft(who) if who == state.me =>
+      client ! Event.PeerLeft(who)
+      context become onIdleState
+
+    // The channel manager tells the client that another peer has left
+    case ChannelHandlerActor.Event.PeerLeft(who) =>
+      val newState = state.remove(who.name)
+      client ! Event.PeerLeft(who)
+      context become onChannelState(newState)
+
+    // A peer has sent me a message, forward it to the websocket
+    case msg: Event.MessageReceived =>
+      client ! msg
+
+    //case msg: Event => client ! msg
+    case msg => log.info(s"onChannelState - Unexpected message: $msg")
+  }
+
+  override def receive: Receive = {
+    case x => log.info(s"receive - Unexpected message: $x")
   }
 }
 
