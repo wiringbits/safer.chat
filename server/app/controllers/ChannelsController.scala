@@ -112,10 +112,11 @@ object ChannelsController {
 
   private implicit val peerFormat: Format[Peer] = new Format[Peer] {
     override def reads(json: JsValue): JsResult[Peer] = {
+      val key = KeyPairs.generate()
       for {
         name <- (json \ "name").validate[Peer.Name]
-        key <- (json \ "key").validate[Peer.Key]
-      } yield Peer.Simple(name, key)
+        //key <- (json \ "key").validate[Peer.Key]
+      } yield Peer.Simple(name, Peer.Key(key.getPublic))
     }
 
     override def writes(o: Peer): JsValue = {
@@ -138,6 +139,22 @@ object ChannelsController {
     }
 
     result.flatMap(identity)
+  }
+
+  implicit val joinChannelWrites: Writes[Command.JoinChannel] = Json.writes[Command.JoinChannel]
+  implicit val sendMessageWrites: Writes[Command.SendMessage] = Json.writes[Command.SendMessage]
+  implicit val commandWrites: Writes[Command] = {
+    case obj: Command.JoinChannel =>
+      Json.obj(
+        "type" -> "joinChannel",
+        "data" -> Json.toJson(obj)(joinChannelWrites)
+      )
+
+    case obj: Command.SendMessage =>
+      Json.obj(
+        "type" -> "sendMessage",
+        "data" -> Json.toJson(obj)(sendMessageWrites)
+      )
   }
 
   private val channelJoinedWrites: Writes[Event.ChannelJoined] = Json.writes[Event.ChannelJoined]

@@ -5,9 +5,11 @@ import java.security.{KeyPair, PrivateKey, PublicKey}
 import akka.actor.{ActorRef, ActorSystem, PoisonPill}
 import akka.testkit.{TestKit, TestProbe}
 import com.alexitc.chat.models._
+import controllers.ChannelsController
 import javax.crypto.Cipher
 import org.scalatest.MustMatchers._
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
+import play.api.libs.json.Json
 
 class PeerActorSpec
     extends TestKit(ActorSystem("PeerActorSpec"))
@@ -15,6 +17,7 @@ class PeerActorSpec
         with BeforeAndAfterAll {
 
   import PeerActorSpec._
+  import controllers.ChannelsController._
 
   override def afterAll: Unit = {
     TestKit.shutdownActorSystem(system)
@@ -38,6 +41,8 @@ class PeerActorSpec
     val carlos = TestPeer("carlos", channelHandler)
 
     "allow alice to create the channel" in {
+      val json = Json.toJson(PeerActor.Command.JoinChannel(channelName, channelSecret, alice.peer))
+      println(Json.prettyPrint(json))
       alice.actor ! PeerActor.Command.JoinChannel(channelName, channelSecret, alice.peer)
       alice.client.expectMsg(PeerActor.Event.ChannelJoined(channelName, Set.empty))
     }
@@ -64,6 +69,8 @@ class PeerActorSpec
     val plainTextMessage = "hola!"
     val message = Message(Base64String.apply(encrypt(bob.keys.getPublic, plainTextMessage)))
     "allow alice to send a message to bob encrypting it with bob's key" in {
+      val json = Json.toJson(PeerActor.Command.SendMessage(bob.peer.name, message))
+      println(Json.prettyPrint(json))
       alice.actor ! PeerActor.Command.SendMessage(bob.peer.name, message)
       bob.client.expectMsg(PeerActor.Event.MessageReceived(alice.peer, message))
     }
