@@ -1,8 +1,11 @@
 import { BrowserModule } from '@angular/platform-browser';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { NgModule } from '@angular/core';
 
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
+
+import { SocketIoModule, SocketIoConfig } from 'ngx-socket-io';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -10,25 +13,36 @@ import { AppComponent } from './app.component';
 import { CreateChannelComponent } from './components/create-channel/create-channel.component';
 import { JoinChannelComponent } from './components/join-channel/join-channel.component';
 import { HomeComponent } from './components/home/home.component';
+import { ChatService } from './services/chat.service';
 import { CryptoService } from './services/crypto.service';
+import { SharedModule } from './shared/shared.module';
+import { DialogUserComponent } from './components/dialog-user/dialog-user.component';
+
+const config: SocketIoConfig = { url: 'http://localhost:9000/ws', options: {} };
 
 @NgModule({
   declarations: [
     AppComponent,
     CreateChannelComponent,
     JoinChannelComponent,
-    HomeComponent
+    HomeComponent,
+    DialogUserComponent
   ],
   imports: [
     BrowserModule,
+    BrowserAnimationsModule,
     AppRoutingModule,
     FormsModule,
     ReactiveFormsModule,
     HttpClientModule,
+    SocketIoModule.forRoot(config),
+    SharedModule
   ],
   providers: [
-    CryptoService
+    CryptoService,
+    ChatService
   ],
-  bootstrap: [AppComponent]
+  bootstrap: [AppComponent],
+  entryComponents: [DialogUserComponent]
 })
 export class AppModule { }

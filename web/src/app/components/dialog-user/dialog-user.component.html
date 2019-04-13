@@ -1,0 +1,35 @@
+<h2 mat-dialog-title>{{params.title}}</h2>
+
+<mat-dialog-content>
+  <div [formGroup]="userFormControl">
+    <p>
+      <mat-form-field>
+        <input matInput placeholder="Username" 
+        formControlName="username" (keyup.enter)="onSave()"  required>
+        <mat-error>This field is required</mat-error>
+      </mat-form-field>
+    </p>
+    <p>
+      <mat-form-field>
+        <input matInput placeholder="Channel" 
+        (keyup.enter)="onSave()" formControlName="channel" required>
+        <mat-error>This field is required</mat-error>
+      </mat-form-field>
+    </p>
+    <mat-form-field>
+        <input matInput placeholder="Password" type="password"
+        (keyup.enter)="onSave()" formControlName="secret" required>
+        <mat-error>This field is required</mat-error>
+      </mat-form-field>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions *ngIf="params?.dialogType === 0" [attr.align]="'end'">
+  <button mat-raised-button color="primary" mat-dialog-close (click)="onSave()" 
+  [disabled]="userFormControl.invalid">Login!</button>
+</mat-dialog-actions>
+
+<mat-dialog-actions *ngIf="params?.dialogType === 'edit-user'" [attr.align]="'end'">
+  <button mat-button mat-dialog-close color="secondary">Close</button>
+  <button mat-raised-button color="primary" mat-dialog-close (click)="onSave()">Save</button>
+</mat-dialog-actions>
