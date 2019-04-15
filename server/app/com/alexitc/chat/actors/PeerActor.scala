@@ -2,8 +2,14 @@ package com.alexitc.chat.actors
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import com.alexitc.chat.models.{Channel, Message, Peer}
+import play.api.libs.json.{JsError, JsSuccess, JsValue, Reads}
 
-class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) extends Actor with ActorLogging {
+class PeerActor(
+    client: ActorRef,
+    channelHandler: ChannelHandlerActor.Ref)(
+    implicit commandReads: Reads[PeerActor.Command])
+    extends Actor
+    with ActorLogging {
 
   import PeerActor._
 
@@ -20,11 +26,29 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
   }
 
   /**
+   * The Command decoding is done here to be able to report validation issues.
+   *
+   * It seems that play has no way to do that.
+   */
+  private def handleJsonMessage(json: JsValue): Unit = {
+    json.validate[Command] match {
+      case JsSuccess(command, _) =>
+        self ! command
+
+      case JsError(errors) =>
+        // TODO: Return errors
+        log.debug(s"Failed to decode command: ${errors.mkString(", ")}")
+    }
+  }
+
+  /**
    * When the client connects, it is in the idle state.
    *
    * Then, the client is only able to join a channel.
    */
   private def onIdleState: Receive = {
+    case json: JsValue => handleJsonMessage(json)
+
     // The client is trying to join a channel, the channel manager must confirm that it can join.
     case Command.JoinChannel(channelName, secret, name) =>
       channelHandler.actor ! ChannelHandlerActor.Command.JoinChannel(channelName, secret, name)
@@ -47,6 +71,8 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
    * The client is already participating in a channel.
    */
   private def onChannelState(state: State.OnChannel): Receive = {
+    case json: JsValue => handleJsonMessage(json)
+
     // The client can send a message directly to another peer
     case Command.SendMessage(to, message) =>
       val peerMaybe = state.channel.peers.find(_.name == to)
@@ -87,7 +113,13 @@ class PeerActor(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) exten
 
 object PeerActor {
 
-  def props(client: ActorRef, channelHandler: ChannelHandlerActor.Ref) = Props(new PeerActor(client, channelHandler))
+  def props(
+      client: ActorRef,
+      channelHandler: ChannelHandlerActor.Ref)(
+      implicit reads: Reads[Command]) = {
+
+    Props(new PeerActor(client, channelHandler))
+  }
 
   sealed trait State
   object State {

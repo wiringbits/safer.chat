@@ -24,7 +24,7 @@ class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: A
     system.actorOf(ChannelHandlerActor.props(channelConfig), "channel-handler")
   )
 
-  def ws() = WebSocket.accept[PeerActor.Command, PeerActor.Event] { _ =>
+  def ws() = WebSocket.accept[JsValue, PeerActor.Event] { _ =>
     ActorFlow.actorRef { client =>
       PeerActor.props(client, channelHandler)
     }
@@ -194,7 +194,7 @@ object ChannelsController {
       )
   }
 
-  implicit val transformer: WebSocket.MessageFlowTransformer[Command, Event] = {
-    WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer[Command, Event]
+  implicit val transformer: WebSocket.MessageFlowTransformer[JsValue, Event] = {
+    WebSocket.MessageFlowTransformer.jsonMessageFlowTransformer[JsValue, Event]
   }
 }

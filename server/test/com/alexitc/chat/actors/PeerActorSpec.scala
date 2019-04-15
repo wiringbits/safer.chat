@@ -9,15 +9,15 @@ import controllers.ChannelsController
 import javax.crypto.Cipher
 import org.scalatest.MustMatchers._
 import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
-import play.api.libs.json.Json
+import play.api.libs.json.{Json, Reads}
 
 class PeerActorSpec
     extends TestKit(ActorSystem("PeerActorSpec"))
         with WordSpecLike
         with BeforeAndAfterAll {
 
+  import ChannelsController._
   import PeerActorSpec._
-  import controllers.ChannelsController._
 
   override def afterAll: Unit = {
     TestKit.shutdownActorSystem(system)
@@ -115,7 +115,12 @@ object PeerActorSpec {
       actor: ActorRef)
 
   object TestPeer {
-    def apply(name: String, channelHandler: ChannelHandlerActor.Ref)(implicit system: ActorSystem): TestPeer = {
+    def apply(
+        name: String,
+        channelHandler: ChannelHandlerActor.Ref)(
+        implicit system: ActorSystem,
+        reads: Reads[PeerActor.Command]): TestPeer = {
+
       val keys = KeyPairs.generate()
       val client = TestProbe()
       val peer = Peer.Simple(Peer.Name(name), Peer.Key(keys.getPublic))
