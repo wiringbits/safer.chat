@@ -135,6 +135,7 @@ object ChannelsController {
       tpe <- (json \ "type").validate[String]
     } yield tpe match {
       case "joinChannel" => (json \ "data").validate[Command.JoinChannel](joinChannelReads)
+      case "leaveChannel" => JsSuccess(Command.LeaveChannel)
       case "sendMessage" => (json \ "data").validate[Command.SendMessage](sendMessageReads)
     }
 
@@ -155,6 +156,12 @@ object ChannelsController {
         "type" -> "sendMessage",
         "data" -> Json.toJson(obj)(sendMessageWrites)
       )
+
+    case Command.LeaveChannel =>
+      Json.obj(
+        "type" -> "leaveChannel"
+      )
+
   }
 
   private val channelJoinedWrites: Writes[Event.ChannelJoined] = Json.writes[Event.ChannelJoined]

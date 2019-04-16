@@ -73,6 +73,10 @@ class PeerActor(
   private def onChannelState(state: State.OnChannel): Receive = {
     case json: JsValue => handleJsonMessage(json)
 
+    case Command.LeaveChannel =>
+      channelHandler.actor ! ChannelHandlerActor.Command.LeaveChannel
+      context become onIdleState
+
     // The client can send a message directly to another peer
     case Command.SendMessage(to, message) =>
       val peerMaybe = state.channel.peers.find(_.name == to)
@@ -139,6 +143,7 @@ object PeerActor {
   object Command {
 
     final case class JoinChannel(channel: Channel.Name, secret: Channel.Secret, name: Peer) extends Command
+    final case object LeaveChannel extends Command
     final case class SendMessage(to: Peer.Name, message: Message) extends Command
   }
 
