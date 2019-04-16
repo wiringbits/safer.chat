@@ -4,7 +4,8 @@
 
 export const environment = {
   production: false,
-  SERVER_URL: 'ws://localhost:9000/ws'
+  SERVER_URL: 'ws://localhost:9000/ws',
+  AVATAR_URL: 'https://api.adorable.io/avatars/285'
 };
 
 /*

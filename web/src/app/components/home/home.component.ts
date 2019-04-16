@@ -5,8 +5,6 @@ import { ChatService } from '../../services/chat.service';
 import { Action, User, Message, Event, DialogUserType } from '../../models';
 import { DialogUserComponent } from '../dialog-user/dialog-user.component';
 
-const AVATAR_URL = 'https://api.adorable.io/avatars/285';
-
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
@@ -16,6 +14,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
   action = Action;
   user: User;
+  peers: User[] = [];
   messages: Message[] = [];
   messageContent: string;
   ioConnection: any;
@@ -37,7 +36,6 @@ export class HomeComponent implements OnInit, AfterViewInit {
   constructor(private chat: ChatService, public dialog: MatDialog) { }
 
   ngOnInit(): void {
-    this.initModel();
     setTimeout(() => {
       this.openUserPopup(this.defaultDialogUserParams);
     }, 0);
@@ -46,9 +44,49 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
   private initIoConnection(): void {
     this.chat.connect();
+
     this.chat.messages.subscribe(message => {
-      console.log(message);
+      this.receiveMessages(message);
     });
+  }
+
+  private receiveMessages(message) {
+
+    switch (message.type) {
+      case Event.CHANNELJOINED :
+      {
+        message.data.peers.map( peer => {
+          this.peers.push(new User(peer.name, peer.key));
+        });
+        setInterval(() => {this.sendEmptyMessage(this.chat); }, 60000);
+        break;
+      }
+      case Event.PEERJOINED :
+      {
+        const newPeer: User = new User(message.data.who.name, message.data.who.key);
+        this.peers.push(newPeer);
+        this.messages.push({from: newPeer, action: Action.JOINED});
+        break;
+      }
+      case Event.MESSAGERECEIVED :
+      {
+        const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
+        this.messages.push(new Message(fromUser, this.b64_to_utf8(message.data.message)));
+        break;
+      }
+    }
+  }
+
+  private utf8_to_b64( str ) {
+    return window.btoa(unescape(encodeURIComponent( str )));
+  }
+
+  private b64_to_utf8( str ) {
+    return decodeURIComponent(escape(window.atob( str )));
+  }
+
+  private sendEmptyMessage(chatService: ChatService) {
+    chatService.send({});
   }
 
   ngAfterViewInit(): void {
@@ -65,20 +103,33 @@ export class HomeComponent implements OnInit, AfterViewInit {
     }
   }
 
-  private initModel(): void {
-    const randomId = this.getRandomId();
-    this.user = {
-      id: randomId,
-      avatar: `${AVATAR_URL}/${randomId}.png`
-    };
+  public sendMessage(messageContent) {
+    let message: any;
+
+    if (!messageContent) {
+      return;
+    }
+
+    this.peers.map(peer => {
+      message = {
+        type : Action.SENDMESSAGE,
+        data : {
+          to : peer.name,
+          message : this.utf8_to_b64(messageContent)
+        }
+      };
+      this.chat.send(message);
+    });
+    this.messages.push(new Message(this.user, messageContent));
+    this.messageContent = '';
   }
 
   public sendNotification(params: any, action: Action): void {
-    let message: Message;
+    let message: any;
 
     if (action === Action.JOINED) {
       message = {
-        type : 'joinChannel',
+        type : Action.JOINED,
         data : {
           channel : params.channel,
           secret : params.secret,
@@ -89,19 +140,18 @@ export class HomeComponent implements OnInit, AfterViewInit {
       };
     } else if (action === Action.RENAME) {
       message = {
-        action: action,
-        content: {
-          username: this.user,
-          previousUsername: params.previousUsername
+        type : Action.JOINED,
+        data : {
+          channel : params.channel,
+          secret : params.secret,
+          name : {
+            name : params.username
+          }
         }
       };
     }
 
     this.chat.send(message);
-  }
-
-  private getRandomId(): number {
-  return Math.floor(Math.random() * (1000000)) + 1;
   }
 
   public onClickUserInfo() {
@@ -121,7 +171,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
         return;
       }
 
-      this.user = paramsDialog.username;
+      this.user = new User(paramsDialog.username);
       if (paramsDialog.dialogType === DialogUserType.NEW) {
         this.initIoConnection();
         this.sendNotification(paramsDialog, Action.JOINED);
