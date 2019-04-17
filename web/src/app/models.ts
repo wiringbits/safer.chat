@@ -7,13 +7,15 @@ export enum Action {
   SENDMESSAGE = 'sendMessage'
 }
 
-// Socket.io events
+// Socket events
 export enum Event {
   CHANNELJOINED = 'channelJoined',
   PEERJOINED = 'peerJoined',
   CONNECT = 'connect',
   DISCONNECT = 'disconnect',
-  MESSAGERECEIVED = 'messageReceived'
+  MESSAGERECEIVED = 'messageReceived',
+  PEERLEFT = 'peerLeft',
+  COMMANDREJECTED = 'commandRejected'
 }
 
 export enum DialogUserType {

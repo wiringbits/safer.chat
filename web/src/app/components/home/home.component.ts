@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewChildren, ViewChild, AfterViewInit, QueryList, ElementRef } from '@angular/core';
-import { MatDialog, MatDialogRef, MatList, MatListItem } from '@angular/material';
+import { MatDialog, MatDialogRef, MatList, MatListItem, MatSnackBar } from '@angular/material';
 
 import { ChatService } from '../../services/chat.service';
 import { Action, User, Message, Event, DialogUserType } from '../../models';
@@ -19,6 +19,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
   messageContent: string;
   ioConnection: any;
   dialogRef: MatDialogRef<DialogUserComponent> | null;
+  errorsMessages: any;
   defaultDialogUserParams: any = {
     disableClose: true,
     data: {
@@ -27,52 +28,80 @@ export class HomeComponent implements OnInit, AfterViewInit {
     }
   };
 
+  constructor(private chat: ChatService,
+              public dialog: MatDialog,
+              private snackBar: MatSnackBar) { }
+
   // getting a reference to the overall list, which is the parent container of the list items
   @ViewChild(MatList, { read: ElementRef }) matList: ElementRef;
 
   // getting a reference to the items/messages within the list
   @ViewChildren(MatListItem, { read: ElementRef }) matListItems: QueryList<MatListItem>;
 
-  constructor(private chat: ChatService, public dialog: MatDialog) { }
 
   ngOnInit(): void {
     setTimeout(() => {
       this.openUserPopup(this.defaultDialogUserParams);
     }, 0);
+
     this.initIoConnection();
+
+    setInterval(() => {
+      this.sendEmptyMessage(this.chat);
+    }, 60000);
   }
 
   private initIoConnection(): void {
     this.chat.connect();
 
-    this.chat.messages.subscribe(message => {
-      this.receiveMessages(message);
-    });
+    this.chat.messages.subscribe(
+      message => {
+        this.receiveMessages(message);
+      },
+      error => {
+        this.errorsMessages = this.snackBar.open('The server is not available, try again later');
+      }
+    );
   }
 
   private receiveMessages(message) {
-
     switch (message.type) {
-      case Event.CHANNELJOINED :
+      case Event.CHANNELJOINED:
       {
         message.data.peers.map( peer => {
-          this.peers.push(new User(peer.name, peer.key));
+          const user: User =  new User(peer.name, peer.key);
+          this.peers.push(user);
+          this.messages.push({from: user, action: Action.JOINED});
         });
-        setInterval(() => {this.sendEmptyMessage(this.chat); }, 60000);
         break;
       }
-      case Event.PEERJOINED :
+      case Event.PEERJOINED:
       {
         const newPeer: User = new User(message.data.who.name, message.data.who.key);
         this.peers.push(newPeer);
         this.messages.push({from: newPeer, action: Action.JOINED});
         break;
       }
-      case Event.MESSAGERECEIVED :
+      case Event.MESSAGERECEIVED:
       {
         const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
         this.messages.push(new Message(fromUser, this.b64_to_utf8(message.data.message)));
         break;
+      }
+      case Event.PEERLEFT:
+      {
+
+        const whoUser: User = this.peers.find(peer => peer.name === message.data.who.name);
+        const index: number = this.peers.findIndex(peer => peer.name === message.data.who.name);
+        this.messages.push({from: whoUser, action: Action.LEFT});
+        this.peers.splice(index, 1);
+        break;
+      }
+      case Event.COMMANDREJECTED:
+      {
+        this.snackBar.open(message.data.reason, 'OK', {duration: 5000});
+        this.openUserPopup(this.defaultDialogUserParams);
+
       }
     }
   }
@@ -126,31 +155,26 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
   public sendNotification(params: any, action: Action): void {
     let message: any;
+    message = {
+      type : Action.JOINED,
+      data : {
+        channel : params.channel,
+        secret : params.secret,
+        name : {
+          name : params.username
+        }
+      }
+    };
 
-    if (action === Action.JOINED) {
-      message = {
-        type : Action.JOINED,
-        data : {
-          channel : params.channel,
-          secret : params.secret,
-          name : {
-            name : params.username
-          }
-        }
-      };
-    } else if (action === Action.RENAME) {
-      message = {
-        type : Action.JOINED,
-        data : {
-          channel : params.channel,
-          secret : params.secret,
-          name : {
-            name : params.username
-          }
-        }
-      };
+    if (action === Action.RENAME) {
+      this.leaveChannel();
     }
 
+    this.chat.send(message);
+  }
+
+  private leaveChannel() {
+    const message =  { type: 'leaveChannel' };
     this.chat.send(message);
   }
 

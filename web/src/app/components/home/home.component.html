@@ -13,10 +13,10 @@
             <span> {{message.content}} </span>
           </p>
           <p mat-line *ngIf="message.action === action.JOINED" class="chat-notification">
-            <span> <b>{{message.from.name}}</b> joined to the conversation. </span>
+            <span> <b>{{message.from.name}}</b> joined the channel. </span>
           </p>
-          <p mat-line *ngIf="message.action === action.RENAME" class="chat-notification">
-            <span> <b>{{message.content.previousUsername}}</b> is now <b>{{message.content.username}}</b> </span>
+          <p mat-line *ngIf="message.action === action.LEFT" class="chat-notification">
+            <span> <b>{{message.from.name}}</b> left the channel. </span>
           </p>
         </mat-list-item>
       </mat-list>

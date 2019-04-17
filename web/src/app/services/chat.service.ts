@@ -17,9 +17,7 @@ export class ChatService {
     public connect() {
       this.messages = <Subject<any>>this.wsService
         .connect(environment.SERVER_URL)
-        .pipe(map((response: any): any => {
-            return JSON.parse(response.data);
-        }));
+        .pipe(map( response => JSON.parse(response.data) ) );
     }
 
     public close() {

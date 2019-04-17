@@ -26,10 +26,11 @@
 
 <mat-dialog-actions *ngIf="params?.dialogType === 0" [attr.align]="'end'">
   <button mat-raised-button color="primary" mat-dialog-close (click)="onSave()" 
-  [disabled]="userFormControl.invalid">Login!</button>
+    [disabled]="userFormControl.invalid">Login!</button>
 </mat-dialog-actions>
 
 <mat-dialog-actions *ngIf="params?.dialogType === 1" [attr.align]="'end'">
   <button mat-button mat-dialog-close color="secondary">Close</button>
-  <button mat-raised-button color="primary" mat-dialog-close (click)="onSave()">Save</button>
+  <button mat-raised-button color="primary" [disabled]="userFormControl.invalid" 
+    mat-dialog-close (click)="onSave()">Save</button>
 </mat-dialog-actions>
