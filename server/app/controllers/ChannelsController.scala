@@ -17,7 +17,7 @@ class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: A
 
   private val channelConfig = ChannelHandlerActor.Config(
     maxPeersOnChannel = 4,
-    supportEmail = "support@hidden.chat"
+    supportEmail = "support@safer.chat"
   )
 
   private val channelHandler: ChannelHandlerActor.Ref = ChannelHandlerActor.Ref(
@@ -112,11 +112,10 @@ object ChannelsController {
 
   private implicit val peerFormat: Format[Peer] = new Format[Peer] {
     override def reads(json: JsValue): JsResult[Peer] = {
-      val key = KeyPairs.generate()
       for {
         name <- (json \ "name").validate[Peer.Name]
-        //key <- (json \ "key").validate[Peer.Key]
-      } yield Peer.Simple(name, Peer.Key(key.getPublic))
+        key <- (json \ "key").validate[Peer.Key]
+      } yield Peer.Simple(name, key)
     }
 
     override def writes(o: Peer): JsValue = {
