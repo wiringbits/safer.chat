@@ -94,7 +94,7 @@ object ChannelsController {
   private implicit val peerKeyFormat: Format[Peer.Key] = new Format[Peer.Key] {
     override def reads(json: JsValue): JsResult[Peer.Key] = {
       json
-          .validate[HexString]
+          .validate[Base64String]
           .flatMap { hex =>
             Peer.Key.from(hex)
                 .map(JsSuccess(_))

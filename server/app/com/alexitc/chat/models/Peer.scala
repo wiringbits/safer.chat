@@ -35,7 +35,7 @@ object Peer {
 
   case class Key(value: PublicKey) {
 
-    lazy val encoded: HexString = HexString(value.getEncoded)
+    lazy val encoded: Base64String = Base64String(value.getEncoded)
 
     override def equals(obj: Any): Boolean = obj match {
       case that: Key =>
@@ -53,9 +53,9 @@ object Peer {
 
   object Key {
 
-    def from(hex: HexString): Option[Key] = {
+    def from(base64: Base64String): Option[Key] = {
       KeyPairs
-          .decodePublicKey(hex.bytes)
+          .decodePublicKey(base64.bytes)
           .map(Key.apply)
     }
   }
