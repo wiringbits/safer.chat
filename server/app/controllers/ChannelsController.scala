@@ -17,7 +17,7 @@ class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: A
 
   private val channelConfig = ChannelHandlerActor.Config(
     maxPeersOnChannel = 4,
-    supportEmail = "support@safer.chat"
+    supportEmail = "chat@wiringbits.net"
   )
 
   private val channelHandler: ChannelHandlerActor.Ref = ChannelHandlerActor.Ref(
