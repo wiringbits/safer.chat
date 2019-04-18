@@ -1,0 +1,42 @@
+server {
+  listen 80 default_server;
+
+  return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/safer.chat/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/safer.chat/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+  root /var/www/html;
+
+  index index.html;
+
+  server_name safer.chat;
+
+  # the backend api
+  location /api/ws {
+      proxy_pass http://localhost:9000/ws;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_read_timeout 86400;
+  }
+
+  location /api {
+    rewrite ^/api/(.*) /$1 break;
+    proxy_pass http://localhost:9000;
+  }
+
+  # caching static assets
+  location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
+    expires 7d;
+  }
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}

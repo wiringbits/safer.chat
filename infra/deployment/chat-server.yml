@@ -1,0 +1,93 @@
+---
+- hosts: server
+  gather_facts: no
+  roles:
+    - ubuntu-16-04
+
+  tasks:
+    - name: Install java8
+      become: yes
+      apt:
+        name: default-jre
+        state: latest
+
+    - name: Build the application
+      shell: ./scripts/build-server.sh
+      delegate_to: 127.0.0.1
+
+    - name: Upload the application
+      synchronize:
+        src: app.zip
+        dest: app.zip
+
+    - name: Create the play group
+      become: yes
+      group:
+        name: play
+        state: present
+
+    - name: Create the play user
+      become: yes
+      user:
+        name: play
+        group: play
+        state: present
+        system: yes
+
+    - name: Create the app directory
+      become: yes
+      file:
+        path: /home/play/app
+        state: directory
+        owner: play
+        group: play
+
+    - name: Unpack the application
+      become: yes
+      unarchive:
+        remote_src: yes
+        src: app.zip
+        dest: /home/play/app
+        owner: play
+        group: play
+
+    - name: Set the application config
+      become: yes
+      copy:
+        src: config/chat-server.env
+        dest: /home/play/app/.env
+        owner: play
+        group: play
+
+    - name: Set the application files permissions
+      become: yes
+      file:
+        dest: /home/play/app
+        owner: play
+        group: play
+        recurse: yes
+
+    - name: Add the systemd service
+      become: yes
+      copy:
+        src: systemd-services/chat-server.service
+        dest: /etc/systemd/system/
+        owner: root
+        group: root
+
+    - name: Pick up systemd changes
+      become: yes
+      systemd:
+        daemon_reload: yes
+
+    - name: Restart the application
+      become: yes
+      systemd:
+        name: chat-server
+        state: restarted
+
+    - name: Enable the application to run on system startup
+      become: yes
+      systemd:
+        name: chat-server
+        enabled: yes

@@ -1,0 +1,16 @@
+[Unit]
+Description=Chat Server
+
+[Service]
+Type=simple
+WorkingDirectory=/home/play/app/chat-server-0.1.0-SNAPSHOT
+StandardOutput=tty
+StandardError=tty
+EnvironmentFile=/home/play/app/.env
+LimitNOFILE=65535
+User=play
+ExecStart=/home/play/app/chat-server-0.1.0-SNAPSHOT/bin/chat-server -Dhttp.port=9000 -Dpidfile.path=/dev/null
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

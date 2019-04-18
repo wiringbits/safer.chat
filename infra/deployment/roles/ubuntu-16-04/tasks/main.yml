@@ -1,0 +1,10 @@
+
+- name: Ensure python2 is present (required by ubuntu 16.04)
+  become: yes
+  raw: apt-get -y install python-simplejson
+
+- name: Install unzip tool
+  become: yes
+  apt:
+    name: unzip
+    state: latest
