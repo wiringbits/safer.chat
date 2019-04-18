@@ -22,6 +22,8 @@ case class Channel(
   def leave(who: Peer.HasRef): Channel = {
     copy(peers = peers - who)
   }
+
+  def isEmpty: Boolean = peers.isEmpty
 }
 
 object Channel {

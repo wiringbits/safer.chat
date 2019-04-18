@@ -1,9 +1,9 @@
 package com.alexitc.chat.actors
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import com.alexitc.chat.models.{Channel, Peer}
 
-class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
+class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor with ActorLogging {
 
   import ChannelHandlerActor._
 
@@ -12,19 +12,28 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
   }
 
   override def receive: Receive = {
-    case msg => println(s"receive - unexpected message: $msg")
+    case msg => log.warning(s"receive - unexpected message: $msg")
   }
+
+  private var totalPeers = 0
+  private var activePeers = 0
+  private var exceededTries = 0
 
   private def withChannelsState(channels: State): Receive = {
     case Command.JoinChannel(name, secret, peer) =>
       val who = peer.withRef(sender())
       val channel = channels.getOrElse(name, Channel.empty(name, secret))
       if (channel.peers.size >= config.maxPeersOnChannel) {
+        exceededTries = exceededTries + 1
+        log.info(s"Rejecting peer due to channel full, failed $exceededTries times")
         who.ref ! Event.PeerRejected(s"The channel is full, if you need bigger channels, write us to ${config.supportEmail}")
       } else if (channel.secret == secret) {
         for {
           newState <- joinChannelUnsafe(channels, who, channel)
         } {
+          totalPeers = totalPeers + 1
+          activePeers = activePeers + 1
+          log.info(s"ActivePeers = $activePeers, TotalPeers = $totalPeers, ActiveChannels = ${channels.size}")
           context become withChannelsState(newState)
         }
       } else {
@@ -38,31 +47,36 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor {
         channel <- channels.values
         who <- channel.peers.find(_.ref == whoRef)
       } {
+        activePeers = activePeers - 1
         val newState = leaveChannelUnsafe(channels, who, channel)
         context become withChannelsState(newState)
       }
   }
 
   private def leaveChannelUnsafe(channels: State, who: Peer.HasRef, channel: Channel): State = {
-    println(s"${who.name} is leaving ${channel.name}")
+    log.info(s"${who.name} is leaving ${channel.name}")
 
     // is important to notify the peer that is leaving
     notifyPeerLeft(channel, who)
 
     val newChannel = channel.leave(who)
-    channels.updated(channel.name, newChannel)
+    if (newChannel.isEmpty) {
+      channels - channel.name
+    } else {
+      channels.updated(channel.name, newChannel)
+    }
   }
 
   private def joinChannelUnsafe(channels: State, who: Peer.HasRef, channel: Channel): Option[State] = {
-    println(s"a peer with name=${who.name} is trying to join channel=${channel.name}")
+    log.info(s"a peer with name=${who.name} is trying to join channel=${channel.name}")
     joinChannel(who, channel) match {
       case Left(rejectionEvent) =>
-        println(s"rejecting command, name=${who.name}, reason = ${rejectionEvent.reason}")
+        log.info(s"rejecting command, name=${who.name}, reason = ${rejectionEvent.reason}")
         who.ref ! rejectionEvent
         None
 
       case Right(newChannel) =>
-        println(s"${who.name} has joined ${channel.name}")
+        log.info(s"${who.name} has joined ${channel.name}")
         val newState = channels.updated(channel.name, newChannel)
         notifyPeerJoined(channel, who)
         who.ref ! Event.ChannelJoined(channel, who)
