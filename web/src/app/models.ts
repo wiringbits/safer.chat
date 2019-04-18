@@ -24,15 +24,17 @@ export enum DialogUserType {
 }
 
 export class User {
-  id?: number;
-  name?: string;
-  avatar?: string;
-  key?: string;
-  constructor(name: string, key: string = '') {
-    this.name = name;
-    this.key = key;
-    this.id = Math.floor(Math.random() * (1000000)) + 1;
-    this.avatar = `${environment.AVATAR_URL}/${this.id}.png`;
+  id: number;
+  avatar: string;
+
+  constructor(
+    public name: string,
+    public publicKey: CryptoKey,
+    public base64EncodedPublicKey: string) {
+
+      this.name = name;
+      this.id = Math.floor(Math.random() * (1000000)) + 1;
+      this.avatar = `${environment.AVATAR_URL}/${this.id}.png`;
   }
 }
 

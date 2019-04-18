@@ -1,118 +1,105 @@
 import { Injectable } from '@angular/core';
 
-import { fromByteArray, toByteArray, byteLength } from 'base64-js';
+import { fromByteArray, toByteArray } from 'base64-js';
+
+const RSA_ALGORITHM_NAME = 'RSA-OAEP';
+const RSA_KEY_FORMAT = 'spki';
 
 @Injectable()
 export class CryptoService {
 
   private encryptionKeys: CryptoKeyPair;
-  private publicKey: any ;
+  private base64PublicKey: string; // base64
 
   constructor() {
     this.generateEncryptionKeys();
-
   }
 
-  encrypt(text: string): PromiseLike<string> {
-    const data = new TextEncoder().encode(text);
-    return window.crypto.subtle.encrypt(
-      { name: 'RSA-OAEP' },
-      this.encryptionKeys.publicKey,
-      data
-    ).then( (encrypted) => {
-      const encoded = fromByteArray(new Uint8Array(encrypted));
-      return encoded;
-    });
+  getBase64PublicKey(): string {
+    return this.base64PublicKey;
   }
 
-
-  encrypt2(text: string, cryptoKey: CryptoKey ): PromiseLike<string> {
-    const data = new TextEncoder().encode(text);
-    return window.crypto.subtle.encrypt(
-      { name: 'RSA-OAEP' },
-      cryptoKey,
-      data
-    ).then( (encrypted) => {
-      const encoded = fromByteArray(new Uint8Array(encrypted));
-      return encoded;
-    });
+  getPublicKey(): CryptoKey {
+    return this.encryptionKeys.publicKey;
   }
 
-  decrypt(encoded: string): PromiseLike<string> {
+  decodeBase64PublicKey(base64Encoded: string): PromiseLike<CryptoKey> {
     const params = {
-      name: 'RSA-OAEP'
+      name: RSA_ALGORITHM_NAME,
+      hash: 'SHA-256'
     };
 
-    return window.crypto.subtle.decrypt(params, this.encryptionKeys.privateKey, toByteArray(encoded))
+    const bytes = toByteArray(base64Encoded);
+    return window
+      .crypto
+      .subtle
+      .importKey(RSA_KEY_FORMAT, bytes, params, true, ['encrypt']
+    );
+  }
+
+  /**
+   * Encrypts the given text with the given public key.
+   *
+   * @param text the text to encrypt.
+   * @param publicKey the key used to encrypt the text.
+   * @returns The base64 encoded string representing the encrypted text.
+   */
+  encrypt(text: string, publicKey: CryptoKey): PromiseLike<string> {
+    const data = new TextEncoder().encode(text);
+    return window.crypto.subtle.encrypt(
+      { name: RSA_ALGORITHM_NAME },
+      publicKey,
+      data
+    ).then( (encrypted) => {
+      const encoded = fromByteArray(new Uint8Array(encrypted));
+      return encoded;
+    });
+  }
+
+  /**
+   * Decrypt the base64 encoded string with my private key.
+   * @param base64Encoded the base64 string to decrypt.
+   * @returns the decrypted text.
+   */
+  decrypt(base64Encoded: string): PromiseLike<string> {
+    const params = {
+      name: RSA_ALGORITHM_NAME
+    };
+
+    const bytes = toByteArray(base64Encoded);
+    return window.crypto.subtle.decrypt(params, this.encryptionKeys.privateKey, bytes)
       .then( (decrypted) => {
         const text = new TextDecoder('utf-8').decode(decrypted);
         return text;
       });
   }
 
-  private exportPublicKey () {
-    window.crypto.subtle.exportKey('spki', this.encryptionKeys.publicKey)
-    .then((exported) => {
-      this.publicKey =  Array.prototype.map.call(new Uint8Array(exported), x => ('00' + x.toString(16)).slice(-2)).join('');
-      // this.importPublicKey(this.publicKey).then(data => {
-      //   console.log(data)
-      // });
-    });
-  }
-
-  private str2ab(str: string) {
-    const buf = new ArrayBuffer(str.length);
-    const bufView = new Uint8Array(buf);
-    for (let i = 0, strLen = str.length; i < strLen; i++) {
-      bufView[i] = str.charCodeAt(i);
-    }
-    return buf;
-  }
-
-  public importPublicKey (data: string) {
-
-    const binaryDerString = window.atob(data);
-    // convert from a binary string to an ArrayBuffer
-    const binaryDer = this.str2ab(binaryDerString);
-
-    return window.crypto.subtle.importKey(
-      'spki',
-      binaryDer,
-      {
-        name: 'RSA-OAEP',
-        hash: 'SHA-256'
-      },
-      true,
-      ['encrypt']
-    );
-
-//     const encryptAlgorithm = {
-//       name: 'RSA-OAEP',
-//       hash: 'SHA-256'
-//     };
-
-// console.log(encryptAlgorithm)
-// const array = toByteArray(data);
-// console.log(array)
-//     return window.crypto.subtle.importKey('spki', array, encryptAlgorithm , true, ['encrypt']);
-  }
-
-  public getPublicKey() {
-    return this.publicKey;
-  }
-
   private generateEncryptionKeys() {
     const params = {
-      name: 'RSA-OAEP',
+      name: RSA_ALGORITHM_NAME,
       modulusLength: 2048,
       publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-      hash: { name: 'SHA-256' },
+      hash: 'SHA-256',
     };
 
-    window.crypto.subtle.generateKey(params, false, ['encrypt', 'decrypt'])
-      .then((keyPair) =>  {
-        this.encryptionKeys = keyPair;
-        this.exportPublicKey();
+    window
+      .crypto
+      .subtle
+      .generateKey(params, true, ['encrypt', 'decrypt'])
+      .then(keyPair => this.onEncryptionKeysGenerated(keyPair));
+  }
+
+  /**
+   * Stores the key pair and the base64 encoded public key.
+   */
+  private onEncryptionKeysGenerated(encryptionKeys: CryptoKeyPair) {
+    this.encryptionKeys = encryptionKeys;
+    window
+      .crypto
+      .subtle
+      .exportKey(RSA_KEY_FORMAT, encryptionKeys.publicKey)
+      .then(exportedBytes => {
+        this.base64PublicKey = fromByteArray(new Uint8Array(exportedBytes));
       });
   }
 }

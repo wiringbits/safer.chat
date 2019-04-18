@@ -25,15 +25,16 @@ export class HomeComponent implements OnInit, AfterViewInit {
   defaultDialogUserParams: any = {
     disableClose: true,
     data: {
-      title: 'Welcome to Wiring Chat',
+      title: 'Welcome to the Safer Chat',
       dialogType: DialogUserType.NEW
     }
   };
 
-  constructor(private chat: ChatService,
-              public dialog: MatDialog,
-              private snackBar: MatSnackBar,
-              private cryptoService: CryptoService ) { }
+  constructor(
+    private chat: ChatService,
+    public dialog: MatDialog,
+    private snackBar: MatSnackBar,
+    private cryptoService: CryptoService ) {}
 
   // getting a reference to the overall list, which is the parent container of the list items
   @ViewChild(MatList, { read: ElementRef }) matList: ElementRef;
@@ -68,28 +69,36 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   private receiveMessages(message) {
-console.log(message)
     switch (message.type) {
       case Event.CHANNELJOINED:
       {
         message.data.peers.map( peer => {
-          const user: User =  new User(peer.name, peer.key);
-          this.peers.push(user);
-          this.messages.push({from: user, action: Action.JOINED});
+          this
+            .cryptoService
+            .decodeBase64PublicKey(peer.key)
+            .then(publicKey => {
+              const user: User = new User(peer.name, publicKey, peer.key);
+              this.peers.push(user);
+              this.messages.push({ from: user, action: Action.JOINED });
+            });
         });
         break;
       }
       case Event.PEERJOINED:
       {
-        const newPeer: User = new User(message.data.who.name, message.data.who.key);
-        this.peers.push(newPeer);
-        this.messages.push({from: newPeer, action: Action.JOINED});
+        this
+          .cryptoService
+          .decodeBase64PublicKey(message.data.who.key)
+          .then(publicKey => {
+            const newPeer: User = new User(message.data.who.name, publicKey, message.data.who.key);
+            this.peers.push(newPeer);
+            this.messages.push({ from: newPeer, action: Action.JOINED });
+          });
         break;
       }
       case Event.MESSAGERECEIVED:
       {
         this.cryptoService.decrypt(message.data.message).then(data => {
-          console.log(data)
           const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
           this.messages.push(new Message(fromUser, data));
         });
@@ -111,14 +120,6 @@ console.log(message)
 
       }
     }
-  }
-
-  private utf8_to_b64( str ) {
-    return window.btoa(unescape(encodeURIComponent( str )));
-  }
-
-  private b64_to_utf8( str ) {
-    return decodeURIComponent(escape(window.atob( str )));
   }
 
   private sendEmptyMessage(chatService: ChatService) {
@@ -146,24 +147,23 @@ console.log(message)
       return;
     }
 
-    this.peers.map(peer => {
-      this.cryptoService.importPublicKey(peer.key).then(data => {
-        console.log(data);
-        this.cryptoService.encrypt2(messageContent, data).then (encryptedMessage => {
-          console.log(encryptedMessage);
+    this.peers.forEach(peer => {
+      this
+        .cryptoService
+        .encrypt(messageContent, peer.publicKey)
+        .then(encryptedMessage => {
           message = {
-            type : Action.SENDMESSAGE,
-            data : {
-              to : peer.name,
-              message : encryptedMessage
-          }
-        };
-        this.chat.send(message);
-      });
-      this.messages.push(new Message(this.user, messageContent));
-      this.messageContent = '';
+            type: Action.SENDMESSAGE,
+            data: {
+              to: peer.name,
+              message: encryptedMessage
+            }
+          };
+          this.chat.send(message);
+          this.messages.push(new Message(this.user, messageContent));
+          this.messageContent = '';
+        });
     });
-  });
   }
 
   private sendNotification(params: any, action: Action): void {
@@ -175,7 +175,7 @@ console.log(message)
         secret : params.secret,
         name : {
           name : this.user.name,
-          key : this.user.key
+          key: this.user.base64EncodedPublicKey
         }
       }
     };
@@ -209,7 +209,10 @@ console.log(message)
         return;
       }
 
-      this.user = new User(paramsDialog.username, this.cryptoService.getPublicKey());
+      this.user = new User(
+        paramsDialog.username,
+        this.cryptoService.getPublicKey(),
+        this.cryptoService.getBase64PublicKey());
 
       if (paramsDialog.dialogType === DialogUserType.NEW) {
         this.initIoConnection();
