@@ -2,6 +2,8 @@ import { Component, OnInit, ViewChildren, ViewChild, AfterViewInit, QueryList, E
 import { MatDialog, MatDialogRef, MatList, MatListItem, MatSnackBar } from '@angular/material';
 
 import { ChatService } from '../../services/chat.service';
+import { CryptoService } from '../../services/crypto.service';
+
 import { Action, User, Message, Event, DialogUserType } from '../../models';
 import { DialogUserComponent } from '../dialog-user/dialog-user.component';
 
@@ -30,7 +32,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
   constructor(private chat: ChatService,
               public dialog: MatDialog,
-              private snackBar: MatSnackBar) { }
+              private snackBar: MatSnackBar,
+              private cryptoService: CryptoService ) { }
 
   // getting a reference to the overall list, which is the parent container of the list items
   @ViewChild(MatList, { read: ElementRef }) matList: ElementRef;
@@ -65,6 +68,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   private receiveMessages(message) {
+console.log(message)
     switch (message.type) {
       case Event.CHANNELJOINED:
       {
@@ -84,13 +88,16 @@ export class HomeComponent implements OnInit, AfterViewInit {
       }
       case Event.MESSAGERECEIVED:
       {
-        const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
-        this.messages.push(new Message(fromUser, this.b64_to_utf8(message.data.message)));
+        this.cryptoService.decrypt(message.data.message).then(data => {
+          console.log(data)
+          const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
+          this.messages.push(new Message(fromUser, data));
+        });
         break;
+
       }
       case Event.PEERLEFT:
       {
-
         const whoUser: User = this.peers.find(peer => peer.name === message.data.who.name);
         const index: number = this.peers.findIndex(peer => peer.name === message.data.who.name);
         this.messages.push({from: whoUser, action: Action.LEFT});
@@ -140,20 +147,26 @@ export class HomeComponent implements OnInit, AfterViewInit {
     }
 
     this.peers.map(peer => {
-      message = {
-        type : Action.SENDMESSAGE,
-        data : {
-          to : peer.name,
-          message : this.utf8_to_b64(messageContent)
-        }
-      };
-      this.chat.send(message);
+      this.cryptoService.importPublicKey(peer.key).then(data => {
+        console.log(data);
+        this.cryptoService.encrypt2(messageContent, data).then (encryptedMessage => {
+          console.log(encryptedMessage);
+          message = {
+            type : Action.SENDMESSAGE,
+            data : {
+              to : peer.name,
+              message : encryptedMessage
+          }
+        };
+        this.chat.send(message);
+      });
+      this.messages.push(new Message(this.user, messageContent));
+      this.messageContent = '';
     });
-    this.messages.push(new Message(this.user, messageContent));
-    this.messageContent = '';
+  });
   }
 
-  public sendNotification(params: any, action: Action): void {
+  private sendNotification(params: any, action: Action): void {
     let message: any;
     message = {
       type : Action.JOINED,
@@ -161,7 +174,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
         channel : params.channel,
         secret : params.secret,
         name : {
-          name : params.username
+          name : this.user.name,
+          key : this.user.key
         }
       }
     };
@@ -195,7 +209,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
         return;
       }
 
-      this.user = new User(paramsDialog.username);
+      this.user = new User(paramsDialog.username, this.cryptoService.getPublicKey());
+
       if (paramsDialog.dialogType === DialogUserType.NEW) {
         this.initIoConnection();
         this.sendNotification(paramsDialog, Action.JOINED);
