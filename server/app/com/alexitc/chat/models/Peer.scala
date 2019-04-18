@@ -28,10 +28,24 @@ sealed trait Peer {
 }
 
 object Peer {
-  // TODO: The name must match a regex
-  case class Name(string: String) extends AnyVal {
+  class Name private (val string: String) extends AnyVal {
     override def toString: String = string
   }
+  object Name {
+
+    private val pattern = "^[a-z0-9_ -]{3,20}$".r.pattern
+
+    def from(string: String): Option[Name] = {
+      if (string.trim == string &&
+          pattern.matcher(string).matches()) {
+
+        Some(new Name(string))
+      } else {
+        None
+      }
+    }
+  }
+
 
   case class Key(value: PublicKey) {
 

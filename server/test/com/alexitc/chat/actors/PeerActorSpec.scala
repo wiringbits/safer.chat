@@ -33,7 +33,7 @@ class PeerActorSpec
       system.actorOf(ChannelHandlerActor.props(config), "channel-handler")
     )
 
-    val channelName = Channel.Name("test-channel")
+    val channelName = Channel.Name.from("test-channel").get
     val channelSecret = Channel.Secret("dummy-secret")
 
     val alice = TestPeer("alice", channelHandler)
@@ -123,7 +123,7 @@ object PeerActorSpec {
 
       val keys = KeyPairs.generate()
       val client = TestProbe()
-      val peer = Peer.Simple(Peer.Name(name), Peer.Key(keys.getPublic))
+      val peer = Peer.Simple(Peer.Name.from(name).get, Peer.Key(keys.getPublic))
       val actor = system.actorOf(PeerActor.props(client.ref, channelHandler))
       TestPeer(keys, client, peer, actor)
     }

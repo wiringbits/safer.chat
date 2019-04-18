@@ -28,9 +28,23 @@ object Channel {
 
   def empty(name: Name, secret: Secret): Channel = Channel(name, secret, Set.empty)
 
-  // TODO: A channel name must match a regex
-  case class Name(string: String) extends AnyVal {
+  class Name private (val string: String) extends AnyVal {
     override def toString: String = string
+  }
+
+  object Name {
+
+    private val pattern = "^[a-z0-9_ -]{3,20}$".r.pattern
+
+    def from(string: String): Option[Name] = {
+      if (string.trim == string &&
+          pattern.matcher(string).matches()) {
+
+        Some(new Name(string))
+      } else {
+        None
+      }
+    }
   }
 
   // TODO: A secret must match a regex

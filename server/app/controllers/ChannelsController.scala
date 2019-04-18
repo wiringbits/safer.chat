@@ -5,6 +5,7 @@ import akka.stream.Materializer
 import com.alexitc.chat.actors.PeerActor.{Command, Event}
 import com.alexitc.chat.actors.{ChannelHandlerActor, PeerActor}
 import com.alexitc.chat.models._
+import controllers.codecs.CommonCodecs
 import javax.inject.{Inject, Singleton}
 import play.api.libs.json._
 import play.api.libs.streams.ActorFlow
@@ -31,66 +32,12 @@ class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: A
   }
 }
 
-object ChannelsController {
+object ChannelsController extends CommonCodecs {
 
-  private def customFormat[Outer, Inner: Format](wrap: Inner => Outer, unwrap: Outer => Inner): Format[Outer] = new Format[Outer] {
-    override def reads(json: JsValue): JsResult[Outer] = {
-      json
-          .validate[Inner]
-          .map(wrap)
-    }
+  private implicit val base64StringFormat: Format[Base64String] = safeWrapperFormat[Base64String, String](Base64String.from, _.string)
+  private implicit val messageFormat: Format[Message] = wrapperFormat[Message, String](Message.from, _.base64.string)
+  private implicit val peerNameFormat: Format[Peer.Name] = safeWrapperFormat[Peer.Name, String](Peer.Name.from, _.string)
 
-    override def writes(o: Outer): JsValue = {
-      Json.toJson(unwrap(o))
-    }
-  }
-
-  private implicit val hexStringFormat: Format[HexString] = new Format[HexString] {
-    override def reads(json: JsValue): JsResult[HexString] = {
-      json
-          .validate[String]
-          .flatMap { string =>
-            HexString
-                .from(string)
-                .map(JsSuccess(_))
-                .getOrElse(JsError("Invalid hex string"))
-          }
-    }
-
-    override def writes(o: HexString): JsValue = {
-      JsString(o.string)
-    }
-  }
-
-  private implicit val base64StringFormat: Format[Base64String] = new Format[Base64String] {
-    override def reads(json: JsValue): JsResult[Base64String] = {
-      json
-          .validate[String]
-          .flatMap { string =>
-            Base64String
-                .from(string)
-                .map(JsSuccess(_))
-                .getOrElse(JsError("Invalid base64 string"))
-          }
-    }
-
-    override def writes(o: Base64String): JsValue = {
-      JsString(o.string)
-    }
-  }
-
-  private implicit val messageFormat: Format[Message] = new Format[Message] {
-    override def writes(o: Message): JsValue = {
-      JsString(o.base64.string)
-    }
-
-    override def reads(json: JsValue): JsResult[Message] = {
-      json
-          .validate[Base64String]
-          .map(Message.apply)
-    }
-  }
-  private implicit val peerNameFormat: Format[Peer.Name] = customFormat[Peer.Name, String](Peer.Name.apply, _.string)
   private implicit val peerKeyFormat: Format[Peer.Key] = new Format[Peer.Key] {
     override def reads(json: JsValue): JsResult[Peer.Key] = {
       json
@@ -107,8 +54,8 @@ object ChannelsController {
     }
   }
 
-  private implicit val channelNameFormat: Format[Channel.Name] = customFormat[Channel.Name, String](Channel.Name.apply, _.string)
-  private implicit val channelSecretFormat: Format[Channel.Secret] = customFormat[Channel.Secret, String](Channel.Secret.apply, _.string)
+  private implicit val channelNameFormat: Format[Channel.Name] = safeWrapperFormat[Channel.Name, String](Channel.Name.from, _.string)
+  private implicit val channelSecretFormat: Format[Channel.Secret] = wrapperFormat[Channel.Secret, String](Channel.Secret.apply, _.string)
 
   private implicit val peerFormat: Format[Peer] = new Format[Peer] {
     override def reads(json: JsValue): JsResult[Peer] = {
