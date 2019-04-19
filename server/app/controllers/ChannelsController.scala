@@ -35,7 +35,7 @@ class ChannelsController @Inject() (cc: ControllerComponents)(implicit system: A
 object ChannelsController extends CommonCodecs {
 
   private implicit val base64StringFormat: Format[Base64String] = safeWrapperFormat[Base64String, String](Base64String.from, _.string)
-  private implicit val messageFormat: Format[Message] = wrapperFormat[Message, String](Message.from, _.base64.string)
+  private implicit val messageFormat: Format[Message] = wrapperFormat[Message, Base64String](Message.apply, _.base64)
   private implicit val peerNameFormat: Format[Peer.Name] = safeWrapperFormat[Peer.Name, String](Peer.Name.from, _.string)
 
   private implicit val peerKeyFormat: Format[Peer.Key] = new Format[Peer.Key] {
