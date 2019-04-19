@@ -1,24 +1,30 @@
 <h2 mat-dialog-title>{{params.title}}</h2>
-
 <mat-dialog-content>
-  <div [formGroup]="userFormControl">
+  <div [formGroup]="userFormControl" (keyup.enter)="onSave()">
     <p>
       <mat-form-field>
-        <input matInput placeholder="Username" 
-        formControlName="username" (keyup.enter)="onSave()"  required>
-        <mat-error>This field is required</mat-error>
+        <input matInput placeholder="Nickname" 
+          formControlName="nickname" required maxlength="20" 
+          oninput="this.value = this.value.toLowerCase()">
+        <mat-error *ngIf="userFormControl.get('nickname').hasError('required')">
+          This field is required</mat-error>
+        <mat-error *ngIf="userFormControl.get('nickname').hasError('pattern')">
+            This field is invalid</mat-error>
       </mat-form-field>
     </p>
     <p>
       <mat-form-field>
         <input matInput placeholder="Channel" 
-        (keyup.enter)="onSave()" formControlName="channel" required>
-        <mat-error>This field is required</mat-error>
+         formControlName="channel" required maxlength="20">
+         <mat-error *ngIf="userFormControl.get('channel').hasError('required')">
+            This field is required</mat-error>
+          <mat-error *ngIf="userFormControl.get('channel').hasError('pattern')">
+              This field is invalid</mat-error>
       </mat-form-field>
     </p>
     <mat-form-field>
         <input matInput placeholder="Password" type="password"
-        (keyup.enter)="onSave()" formControlName="secret" required>
+        formControlName="secret" required>
         <mat-error>This field is required</mat-error>
       </mat-form-field>
   </div>
@@ -26,11 +32,11 @@
 
 <mat-dialog-actions *ngIf="params?.dialogType === 0" [attr.align]="'end'">
   <button mat-raised-button color="primary" mat-dialog-close (click)="onSave()" 
-    [disabled]="userFormControl.invalid">Login!</button>
+    [disabled]="userFormControl.invalid">Join!</button>
 </mat-dialog-actions>
 
 <mat-dialog-actions *ngIf="params?.dialogType === 1" [attr.align]="'end'">
   <button mat-button mat-dialog-close color="secondary">Close</button>
   <button mat-raised-button color="primary" [disabled]="userFormControl.invalid" 
-    mat-dialog-close (click)="onSave()">Save</button>
+    mat-dialog-close (click)="onSave()">Join!</button>
 </mat-dialog-actions>

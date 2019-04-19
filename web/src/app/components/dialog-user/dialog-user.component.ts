@@ -10,11 +10,11 @@ import { FormGroup, FormControl, Validators } from '@angular/forms';
 export class DialogUserComponent implements OnInit {
 
   userFormControl: FormGroup;
-  previousUsername: string;
+  previousUserData: any;
 
   constructor(public dialogRef: MatDialogRef<DialogUserComponent>,
   @Inject(MAT_DIALOG_DATA) public params: any) {
-    this.previousUsername = params.username ? params.username : undefined;
+    this.previousUserData = params;
   }
 
   ngOnInit() {
@@ -23,19 +23,25 @@ export class DialogUserComponent implements OnInit {
 
   createFormGroup(): FormGroup {
     return new FormGroup({
-      username: new FormControl('', Validators.required),
-      channel: new FormControl('', Validators.required),
-      secret: new FormControl('', Validators.required)
+      nickname: new FormControl(this.params.username, [Validators.required,
+        Validators.pattern('(^[^- ])([a-z0-9 _ -]{1,18})([^- ])$')]),
+      channel: new FormControl(this.params.channel, [Validators.required,
+        Validators.pattern('(^[^- ])([a-z0-9 _ -.]{1,18})([^- ])$')]),
+      secret: new FormControl(this.params.secret, Validators.required)
     });
   }
 
   public onSave(): void {
+    if (this.userFormControl.invalid) {
+      return;
+    }
+
     this.dialogRef.close({
-      username: this.userFormControl.get('username').value,
+      username: this.userFormControl.get('nickname').value,
       channel: this.userFormControl.get('channel').value,
       secret: this.userFormControl.get('secret').value,
       dialogType: this.params.dialogType,
-      previousUsername: this.previousUsername
+      previousUserData: this.previousUserData
     });
   }
 

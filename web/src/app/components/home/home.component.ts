@@ -4,7 +4,7 @@ import { MatDialog, MatDialogRef, MatList, MatListItem, MatSnackBar } from '@ang
 import { ChatService } from '../../services/chat.service';
 import { CryptoService } from '../../services/crypto.service';
 
-import { Action, User, Message, Event, DialogUserType } from '../../models';
+import { Action, User, Message, Event, DialogUserType, Channel } from '../../models';
 import { DialogUserComponent } from '../dialog-user/dialog-user.component';
 
 @Component({
@@ -16,6 +16,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
   action = Action;
   user: User;
+  channel: Channel;
   peers: User[] = [];
   messages: Message[] = [];
   messageContent: string;
@@ -25,10 +26,20 @@ export class HomeComponent implements OnInit, AfterViewInit {
   defaultDialogUserParams: any = {
     disableClose: true,
     data: {
-      title: 'Welcome to the Safer Chat',
+      name: '',
+      channel: '',
+      secret: '',
+      title: 'Welcome to the safer.chat',
       dialogType: DialogUserType.NEW
     }
   };
+
+  welcomeMessage = `
+    Just enter a nickname, a channel name, and a password.
+    Then, anyone with the channel and password can join the chat,
+    all the messages there are end-to-end encrypted which means that only
+    the participants can read them
+  `;
 
   constructor(
     private chat: ChatService,
@@ -68,42 +79,39 @@ export class HomeComponent implements OnInit, AfterViewInit {
     );
   }
 
-  private receiveMessages(message) {
+  private async receiveMessages(message) {
     switch (message.type) {
       case Event.CHANNELJOINED:
       {
-        message.data.peers.map( peer => {
-          this
-            .cryptoService
-            .decodeBase64PublicKey(peer.key)
-            .then(publicKey => {
-              const user: User = new User(peer.name, publicKey, peer.key);
-              this.peers.push(user);
-              this.messages.push({ from: user, action: Action.JOINED });
-            });
+        // clear history
+        this.messages = [];
+        this.messages.push(new Message(new User('safer.chat'), this.welcomeMessage));
+        message.data.peers.map(async peer => {
+
+          const publicKey = await this.cryptoService.decodeBase64PublicKey(peer.key);
+
+          const user: User = new User(peer.name, publicKey, peer.key);
+
+          this.peers.push(user);
+          this.messages.push({ from: user, action: Action.JOINED });
         });
+
         break;
       }
       case Event.PEERJOINED:
       {
-        this
-          .cryptoService
-          .decodeBase64PublicKey(message.data.who.key)
-          .then(publicKey => {
-            const newPeer: User = new User(message.data.who.name, publicKey, message.data.who.key);
-            this.peers.push(newPeer);
-            this.messages.push({ from: newPeer, action: Action.JOINED });
-          });
+        const publicKey = await this.cryptoService.decodeBase64PublicKey(message.data.who.key);
+        const newPeer: User = new User(message.data.who.name, publicKey, message.data.who.key);
+        this.peers.push(newPeer);
+        this.messages.push({ from: newPeer, action: Action.JOINED });
         break;
       }
       case Event.MESSAGERECEIVED:
       {
-        this.cryptoService.decrypt(message.data.message).then(data => {
-          const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
-          this.messages.push(new Message(fromUser, data));
-        });
+        const messageDecrypted = await this.cryptoService.decrypt(message.data.message);
+        const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
+        this.messages.push(new Message(fromUser, messageDecrypted));
         break;
-
       }
       case Event.PEERLEFT:
       {
@@ -115,9 +123,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
       }
       case Event.COMMANDREJECTED:
       {
-        this.snackBar.open(message.data.reason, 'OK', {duration: 5000});
+        this.snackBar.open(message.data.reason, 'OK', {duration: 10000});
         this.openUserPopup(this.defaultDialogUserParams);
-
       }
     }
   }
@@ -160,10 +167,10 @@ export class HomeComponent implements OnInit, AfterViewInit {
             }
           };
           this.chat.send(message);
-          this.messages.push(new Message(this.user, messageContent));
-          this.messageContent = '';
         });
     });
+    this.messages.push(new Message(this.user, messageContent));
+    this.messageContent = '';
   }
 
   private sendNotification(params: any, action: Action): void {
@@ -197,7 +204,9 @@ export class HomeComponent implements OnInit, AfterViewInit {
       data: {
         username: this.user.name,
         title: 'Edit Details',
-        dialogType: DialogUserType.EDIT
+        dialogType: DialogUserType.EDIT,
+        channel: this.channel.name,
+        secret: this.channel.secret
       }
     });
   }
@@ -213,6 +222,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
         paramsDialog.username,
         this.cryptoService.getPublicKey(),
         this.cryptoService.getBase64PublicKey());
+
+      this.channel = new Channel(paramsDialog.channel, paramsDialog.secret);
 
       if (paramsDialog.dialogType === DialogUserType.NEW) {
         this.initIoConnection();

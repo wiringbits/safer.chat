@@ -29,8 +29,8 @@ export class User {
 
   constructor(
     public name: string,
-    public publicKey: CryptoKey,
-    public base64EncodedPublicKey: string) {
+    public publicKey?: CryptoKey,
+    public base64EncodedPublicKey?: string) {
 
       this.name = name;
       this.id = Math.floor(Math.random() * (1000000)) + 1;
@@ -55,6 +55,8 @@ export class ChatMessage extends Message {
 }
 
 export class Channel {
-  consutructor (channelName: string) {
+  constructor (public name: string, public secret: string) {
+    this.name = name;
+    this.secret = secret;
   }
 }

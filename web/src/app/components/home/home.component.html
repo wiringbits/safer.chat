@@ -9,8 +9,8 @@
           <h4 mat-line *ngIf="message.action === undefined">
             <b>{{message.from.name}}</b>
           </h4>
-          <p mat-line *ngIf="message.action === undefined">
-            <span> {{message.content}} </span>
+          <p mat-line *ngIf="message.action === undefined" class="white-space-normal">
+            <span class="white-space-normal"> {{message.content}} </span>
           </p>
           <p mat-line *ngIf="message.action === action.JOINED" class="chat-notification">
             <span> <b>{{message.from.name}}</b> joined the channel. </span>

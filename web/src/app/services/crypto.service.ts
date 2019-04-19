@@ -74,7 +74,7 @@ export class CryptoService {
       });
   }
 
-  private generateEncryptionKeys() {
+  private async generateEncryptionKeys() {
     const params = {
       name: RSA_ALGORITHM_NAME,
       modulusLength: 2048,
@@ -82,24 +82,22 @@ export class CryptoService {
       hash: 'SHA-256',
     };
 
-    window
+    this.encryptionKeys = await window
       .crypto
       .subtle
-      .generateKey(params, true, ['encrypt', 'decrypt'])
-      .then(keyPair => this.onEncryptionKeysGenerated(keyPair));
+      .generateKey(params, true, ['encrypt', 'decrypt']);
+    this.onEncryptionKeysGenerated();
   }
 
   /**
-   * Stores the key pair and the base64 encoded public key.
+   * Stores base64 encoded public key.
    */
-  private onEncryptionKeysGenerated(encryptionKeys: CryptoKeyPair) {
-    this.encryptionKeys = encryptionKeys;
-    window
+  private async onEncryptionKeysGenerated() {
+    const exportedBytes = await window
       .crypto
       .subtle
-      .exportKey(RSA_KEY_FORMAT, encryptionKeys.publicKey)
-      .then(exportedBytes => {
-        this.base64PublicKey = fromByteArray(new Uint8Array(exportedBytes));
-      });
+      .exportKey(RSA_KEY_FORMAT, this.encryptionKeys.publicKey);
+
+      this.base64PublicKey = fromByteArray(new Uint8Array(exportedBytes));
   }
 }
