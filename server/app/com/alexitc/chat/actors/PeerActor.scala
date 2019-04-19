@@ -81,7 +81,7 @@ class PeerActor(
     case Command.SendMessage(to, message) =>
       val peerMaybe = state.channel.peers.find(_.name == to)
       peerMaybe.foreach { peer =>
-        log.info(s"Send message to ${peer.name}")
+        log.info(s"${state.me.name}: Send message to ${peer.name}")
         peer.ref ! Event.MessageReceived(state.me, message)
       }
 
@@ -111,7 +111,7 @@ class PeerActor(
   }
 
   override def receive: Receive = {
-    case x => log.info(s"receive - Unexpected message: $x")
+    case x => log.warning(s"receive - Unexpected message: $x")
   }
 }
 
