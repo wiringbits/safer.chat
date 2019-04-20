@@ -23,7 +23,7 @@ export class DialogUserComponent implements OnInit {
 
   createFormGroup(): FormGroup {
     return new FormGroup({
-      nickname: new FormControl(this.params.username, [Validators.required,
+      nickname: new FormControl(this.params.nickname, [Validators.required,
         Validators.pattern('(^[^- ])([a-z0-9 _ -]{1,18})([^- ])$')]),
       channel: new FormControl(this.params.channel, [Validators.required,
         Validators.pattern('(^[^- ])([a-z0-9 _ -.]{1,18})([^- ])$')]),
@@ -31,7 +31,7 @@ export class DialogUserComponent implements OnInit {
     });
   }
 
-  public onSave(): void {
+  public onJoin(): void {
     if (this.userFormControl.invalid) {
       return;
     }

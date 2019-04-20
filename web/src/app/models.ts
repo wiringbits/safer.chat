@@ -3,7 +3,7 @@ import { environment } from '../environments/environment';
 export enum Action {
   JOINED = 'joinChannel',
   RENAME = 'renameChannel',
-  LEFT = 'leftChannel',
+  LEFT = 'leaveChannel',
   SENDMESSAGE = 'sendMessage'
 }
 
@@ -55,6 +55,7 @@ export class ChatMessage extends Message {
 }
 
 export class Channel {
+  sha256Secret?: string;
   constructor (public name: string, public secret: string) {
     this.name = name;
     this.secret = secret;

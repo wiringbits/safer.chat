@@ -7,6 +7,14 @@ import { CryptoService } from '../../services/crypto.service';
 import { Action, User, Message, Event, DialogUserType, Channel } from '../../models';
 import { DialogUserComponent } from '../dialog-user/dialog-user.component';
 
+const  WELCOMEMESSAGE = `
+  Welcome to safer.chat, a really good place to chat,
+  all the messages here are end-to-end encrypted which
+  means that only the participants in the channel can read them.
+  share your channel name and password and enjoy`;
+
+const SAFERCHAT = 'safer.chat';
+
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
@@ -26,20 +34,13 @@ export class HomeComponent implements OnInit, AfterViewInit {
   defaultDialogUserParams: any = {
     disableClose: true,
     data: {
-      name: '',
+      nickname: '',
       channel: '',
       secret: '',
       title: 'Welcome to the safer.chat',
       dialogType: DialogUserType.NEW
     }
   };
-
-  welcomeMessage = `
-    Just enter a nickname, a channel name, and a password.
-    Then, anyone with the channel and password can join the chat,
-    all the messages there are end-to-end encrypted which means that only
-    the participants can read them
-  `;
 
   constructor(
     private chat: ChatService,
@@ -85,13 +86,11 @@ export class HomeComponent implements OnInit, AfterViewInit {
       {
         // clear history
         this.messages = [];
-        this.messages.push(new Message(new User('safer.chat'), this.welcomeMessage));
+        this.messages.push(new Message(new User(SAFERCHAT), WELCOMEMESSAGE));
         message.data.peers.map(async peer => {
 
           const publicKey = await this.cryptoService.decodeBase64PublicKey(peer.key);
-
           const user: User = new User(peer.name, publicKey, peer.key);
-
           this.peers.push(user);
           this.messages.push({ from: user, action: Action.JOINED });
         });
@@ -104,6 +103,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
         const newPeer: User = new User(message.data.who.name, publicKey, message.data.who.key);
         this.peers.push(newPeer);
         this.messages.push({ from: newPeer, action: Action.JOINED });
+        this.sendBrowserNotification(newPeer.name, Event.PEERJOINED);
         break;
       }
       case Event.MESSAGERECEIVED:
@@ -111,25 +111,31 @@ export class HomeComponent implements OnInit, AfterViewInit {
         const messageDecrypted = await this.cryptoService.decrypt(message.data.message);
         const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
         this.messages.push(new Message(fromUser, messageDecrypted));
+        this.sendBrowserNotification(fromUser.name, Event.MESSAGERECEIVED);
         break;
       }
       case Event.PEERLEFT:
       {
-        const whoUser: User = this.peers.find(peer => peer.name === message.data.who.name);
+        const userLeft: User = this.peers.find(peer => peer.name === message.data.who.name);
         const index: number = this.peers.findIndex(peer => peer.name === message.data.who.name);
-        this.messages.push({from: whoUser, action: Action.LEFT});
+        this.messages.push({from: userLeft, action: Action.LEFT});
         this.peers.splice(index, 1);
+        this.sendBrowserNotification(userLeft.name, Event.PEERLEFT);
         break;
       }
       case Event.COMMANDREJECTED:
       {
         this.snackBar.open(message.data.reason, 'OK', {duration: 10000});
+        this.defaultDialogUserParams.data.nickname = this.user.name;
+        this.defaultDialogUserParams.data.channel = this.channel.name;
+        this.defaultDialogUserParams.data.secret = this.channel.secret;
         this.openUserPopup(this.defaultDialogUserParams);
       }
     }
   }
 
   private sendEmptyMessage(chatService: ChatService) {
+    this.chat.connect();
     chatService.send({});
   }
 
@@ -178,8 +184,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
     message = {
       type : Action.JOINED,
       data : {
-        channel : params.channel,
-        secret : params.secret,
+        channel : this.channel.name,
+        secret : this.channel.sha256Secret,
         name : {
           name : this.user.name,
           key: this.user.base64EncodedPublicKey
@@ -187,22 +193,18 @@ export class HomeComponent implements OnInit, AfterViewInit {
       }
     };
 
-    if (action === Action.RENAME) {
-      this.leaveChannel();
-    }
-
     this.chat.send(message);
   }
 
   private leaveChannel() {
-    const message =  { type: 'leaveChannel' };
+    const message =  { type: Action.LEFT };
     this.chat.send(message);
   }
 
   public onClickUserInfo() {
     this.openUserPopup({
       data: {
-        username: this.user.name,
+        nickname: this.user.name,
         title: 'Edit Details',
         dialogType: DialogUserType.EDIT,
         channel: this.channel.name,
@@ -213,7 +215,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
   private openUserPopup(params): void {
     this.dialogRef = this.dialog.open(DialogUserComponent, params);
-    this.dialogRef.afterClosed().subscribe(paramsDialog => {
+    this.dialogRef.afterClosed().subscribe(async paramsDialog => {
       if (!paramsDialog) {
         return;
       }
@@ -223,14 +225,51 @@ export class HomeComponent implements OnInit, AfterViewInit {
         this.cryptoService.getPublicKey(),
         this.cryptoService.getBase64PublicKey());
 
-      this.channel = new Channel(paramsDialog.channel, paramsDialog.secret);
+      this.channel = new Channel(
+        paramsDialog.channel,
+        paramsDialog.secret);
+
+      this.channel.sha256Secret = await this.cryptoService.sha256(paramsDialog.secret);
+      // send notification to appComponent
+      this.chat.setChannnelName(this.channel.name);
 
       if (paramsDialog.dialogType === DialogUserType.NEW) {
-        this.initIoConnection();
         this.sendNotification(paramsDialog, Action.JOINED);
       } else if (paramsDialog.dialogType === DialogUserType.EDIT) {
+        this.leaveChannel();
         this.sendNotification(paramsDialog, Action.RENAME);
       }
     });
+  }
+
+  private sendBrowserNotification (user: string, type: string) {
+    let notificationMsj;
+
+    switch (type) {
+      case Event.MESSAGERECEIVED : {
+        notificationMsj = `New message from ${user}`;
+        break;
+      }
+      case Event.PEERJOINED: {
+        notificationMsj = `${user} joined the channel`;
+        break;
+      }
+      case Event.PEERLEFT: {
+        notificationMsj = `${user} left the channel`;
+        break;
+      }
+    }
+
+    if (!('Notification' in window)) {
+      return;
+    } else if (Notification.permission === 'granted') {
+      const notification = new Notification(notificationMsj);
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(function (permission) {
+        if (permission === 'granted') {
+          const notification = new Notification(notificationMsj);
+        }
+      });
+    }
   }
 }

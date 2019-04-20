@@ -1,6 +1,6 @@
-<h2 mat-dialog-title>{{params.title}}</h2>
+<h3 mat-dialog-title>{{params.title}}</h3>
 <mat-dialog-content>
-  <div [formGroup]="userFormControl" (keyup.enter)="onSave()">
+  <div [formGroup]="userFormControl" (keyup.enter)="onJoin()">
     <p>
       <mat-form-field>
         <input matInput placeholder="Nickname" 
@@ -15,7 +15,8 @@
     <p>
       <mat-form-field>
         <input matInput placeholder="Channel" 
-         formControlName="channel" required maxlength="20">
+         formControlName="channel" required maxlength="20"
+         oninput="this.value = this.value.toLowerCase()">
          <mat-error *ngIf="userFormControl.get('channel').hasError('required')">
             This field is required</mat-error>
           <mat-error *ngIf="userFormControl.get('channel').hasError('pattern')">
@@ -31,12 +32,12 @@
 </mat-dialog-content>
 
 <mat-dialog-actions *ngIf="params?.dialogType === 0" [attr.align]="'end'">
-  <button mat-raised-button color="primary" mat-dialog-close (click)="onSave()" 
+  <button mat-raised-button color="primary" mat-dialog-close (click)="onJoin()" 
     [disabled]="userFormControl.invalid">Join!</button>
 </mat-dialog-actions>
 
 <mat-dialog-actions *ngIf="params?.dialogType === 1" [attr.align]="'end'">
   <button mat-button mat-dialog-close color="secondary">Close</button>
   <button mat-raised-button color="primary" [disabled]="userFormControl.invalid" 
-    mat-dialog-close (click)="onSave()">Join!</button>
+    mat-dialog-close (click)="onJoin()">Join!</button>
 </mat-dialog-actions>
