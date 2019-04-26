@@ -5,7 +5,7 @@
       <mat-form-field>
         <input matInput placeholder="Nickname" 
           formControlName="nickname" required maxlength="20" 
-          oninput="this.value = this.value.toLowerCase()">
+          oninput="this.value = this.value.toLowerCase()" autocapitalize="none">
         <mat-error *ngIf="userFormControl.get('nickname').hasError('required')">
           This field is required</mat-error>
         <mat-error *ngIf="userFormControl.get('nickname').hasError('pattern')">
@@ -16,7 +16,7 @@
       <mat-form-field>
         <input matInput placeholder="Channel" 
          formControlName="channel" required maxlength="20"
-         oninput="this.value = this.value.toLowerCase()">
+         oninput="this.value = this.value.toLowerCase()" autocapitalize="none">
          <mat-error *ngIf="userFormControl.get('channel').hasError('required')">
             This field is required</mat-error>
           <mat-error *ngIf="userFormControl.get('channel').hasError('pattern')">

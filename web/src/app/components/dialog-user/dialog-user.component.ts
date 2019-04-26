@@ -44,5 +44,4 @@ export class DialogUserComponent implements OnInit {
       previousUserData: this.previousUserData
     });
   }
-
 }

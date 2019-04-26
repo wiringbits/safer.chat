@@ -18,6 +18,10 @@ export class AppComponent implements OnInit {
       channelName => this.channelName = channelName
     );
 
+    window.onunload = window.onbeforeunload = () => {
+      return confirm('Are you sure to reload the page?  al data will be lost ');
+    };
+
     Notification.requestPermission();
   }
 }

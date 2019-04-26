@@ -15,6 +15,7 @@ import { ChatService } from './services/chat.service';
 import { CryptoService } from './services/crypto.service';
 import { SharedModule } from './shared/shared.module';
 import { DialogUserComponent } from './components/dialog-user/dialog-user.component';
+import { ChatComponent } from './components/chat/chat.component';
 
 const config: SocketIoConfig = { url: 'http://localhost:9000/ws', options: {} };
 
@@ -22,7 +23,8 @@ const config: SocketIoConfig = { url: 'http://localhost:9000/ws', options: {} };
   declarations: [
     AppComponent,
     HomeComponent,
-    DialogUserComponent
+    DialogUserComponent,
+    ChatComponent
   ],
   imports: [
     BrowserModule,
