@@ -8,19 +8,13 @@ import { ChatService } from './services/chat.service';
 })
 export class AppComponent implements OnInit {
 
-  title = 'Safer Chat';
-  channelName = '';
-
   constructor(private chat: ChatService) {}
 
   ngOnInit(): void {
-    this.chat.channelName.subscribe(
-      channelName => this.channelName = channelName
-    );
 
-    window.onunload = window.onbeforeunload = () => {
-      return confirm('Are you sure to reload the page?  al data will be lost ');
-    };
+    // window.onunload = window.onbeforeunload = () => {
+    //   return confirm('Are you sure to reload the page?  al data will be lost ');
+    // };
 
     Notification.requestPermission();
   }

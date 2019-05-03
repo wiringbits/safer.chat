@@ -133,6 +133,10 @@ a:hover {
     .offcanvas-btn:focus {
         color: #616876
     }
+
+    .phone-mockup  {
+        margin-top: 125px;
+    }
 }
 
 .offcanvas-btn i {
@@ -513,6 +517,7 @@ footer {
     footer {
         padding: 20px 0
     }
+    
 }
 
 footer a {
@@ -898,3 +903,40 @@ footer form .error {
 .navigation-portrait .nav-menu.nav-menu-social>li>a {
     padding: 15px
 }
+.fa-5 {
+    font-size: 24px;
+}
+
+.fa-7 {
+    font-size: 48px;
+}
+
+.margin-5 {
+    margin-top: 5px;
+}
+
+.green {
+    color: #00ff99;
+}
+
+.red {
+    color: #ff2600;
+}
+
+a {
+    font-weight: 800;
+}
+
+
+.profile-field {
+    margin-bottom: 10px;
+}
+
+#signup {
+    margin-bottom: 50px;
+}
+
+#username_invalid_text {
+    font-size: 14px;
+}
+

@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { Observable, Observer, Subject} from 'rxjs';
-import { Message } from '../models';
 
 @Injectable({
   providedIn: 'root'
@@ -12,7 +11,7 @@ export class WebSocketService {
   private ws: any;
 
   public connect(url: string): Subject<MessageEvent> {
-    if (!this.subject) {
+    if (!this.subject || this.ws.readyState !== WebSocket.OPEN ) {
         this.subject = this.create(url);
     }
     return this.subject;

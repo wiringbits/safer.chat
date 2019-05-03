@@ -1,7 +1,7 @@
 import { environment } from '../environments/environment';
 // Actions you can take on the App
 export enum Action {
-  JOINED = 'joinChannel',
+  JOIN = 'joinChannel',
   RENAME = 'renameChannel',
   LEFT = 'leaveChannel',
   SENDMESSAGE = 'sendMessage'
@@ -10,12 +10,12 @@ export enum Action {
 // Socket events
 export enum Event {
   CHANNELJOINED = 'channelJoined',
-  PEERJOINED = 'peerJoined',
+  PEER_JOINED = 'peerJoined',
   CONNECT = 'connect',
   DISCONNECT = 'disconnect',
-  MESSAGERECEIVED = 'messageReceived',
-  PEERLEFT = 'peerLeft',
-  COMMANDREJECTED = 'commandRejected'
+  MESSAGE_RECEIVED = 'messageReceived',
+  PEER_LEFT = 'peerLeft',
+  COMMAND_REJECTED = 'commandRejected'
 }
 
 export enum DialogUserType {
@@ -39,18 +39,13 @@ export class User {
 }
 
 export class Message {
-  from?: User;
+  from: User;
+  type: string;
   content?: string;
-  action: string;
-  constructor(from: User, content: string) {
+  constructor(from: User, action: string, content?: string) {
     this.from = from;
+    this.type = action;
     this.content = content;
-  }
-}
-
-export class ChatMessage extends Message {
-  constructor(from: User, content: string) {
-    super(from, content);
   }
 }
 
@@ -59,5 +54,20 @@ export class Channel {
   constructor (public name: string, public secret: string) {
     this.name = name;
     this.secret = secret;
+  }
+}
+
+
+export class DialogParams {
+  public disableClose: boolean;
+  public data: {
+    user: User,
+    channel: Channel,
+    title: string
+  };
+  constructor (public user: User, public channel: Channel, disableClose: boolean) {
+    this.data.user = user;
+    this.data.channel = channel;
+    this.disableClose = disableClose;
   }
 }

@@ -4,6 +4,7 @@ import { Subject, BehaviorSubject} from 'rxjs';
 import { map } from 'rxjs/operators';
 import { WebSocketService } from './webSocket.service';
 import { environment } from '../../environments/environment';
+import { Channel, User } from '../models';
 
 
 @Injectable({
@@ -12,10 +13,9 @@ import { environment } from '../../environments/environment';
 export class ChatService {
 
     public messages: Subject<any>;
-    private channelSource = new BehaviorSubject('');
-    private usersSource = new BehaviorSubject([]);
-    public channelName = this.channelSource.asObservable();
-    public channelUsers = this.usersSource.asObservable();
+    private channel: Channel;
+    private user: User;
+    private peers: User[];
 
     constructor(private wsService: WebSocketService) { }
 
@@ -27,8 +27,28 @@ export class ChatService {
       }
     }
 
-    public setChannnelName(name: string) {
-      this.channelSource.next(name);
+    public setChannnel(channel: Channel) {
+      this.channel = channel;
+    }
+
+    public getChannnel() {
+      return this.channel;
+    }
+
+    public setInitialPeers(peers: User[]) {
+      this.peers = peers;
+    }
+
+    public getInitialPeers() {
+      return this.peers;
+    }
+
+    public setUser(user: User) {
+      this.user = user;
+    }
+
+    public getUser() {
+      return this.user;
     }
 
     public close() {

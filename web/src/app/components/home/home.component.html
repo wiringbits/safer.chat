@@ -11,30 +11,66 @@
 <header class="d-flex">
   <div class="container">
     <div class="row">
-      <div class="col-lg-6 d-flex align-items-center">
+      <div class="col-lg-6 d-flex align-items-center"[formGroup]="userFormControl" (keyup.enter)="onJoin()">
         <div class="header-text px-5 pl-lg-0 text-center text-lg-left">
-            <h1 class="display-4 mb-4 p-0">Safest place to chat</h1>
-            <p class="lead mb-5 p-0">
-              Choose a nickname, a channel name and a password for the channel. 
-            </p>
-            <div class="text-left">
-                <span>1. Enter your nickname (lowercase)</span> 
-                <input class="form-control form-control-lg mr-sm-3 px-4" type="text" name="nickname" placeholder="Nickname" required>
-                <span>2. Enter your channel name (lowercase)</span>
-                <input class="form-control form-control-lg mr-sm-3 px-4" type="text" name="channel" placeholder="Channel" required>
-                <span>3. Enter your channel password</span>
-                <input class="form-control form-control-lg mr-sm-3 px-4" type="password" name="password" placeholder="Password" required>
-            </div>
-            <br>
-            <button class="btn btn-primary btn-lg mt-sm-0" name="submit" type="submit">Join!</button>
-            <br>
-            <p>
-              <a  href="#"><b>All the messages here are end-to-end encrypted which
-                  means that only the participants in the channel can read them.</b></a>
-            </p>
-            <div class="w-100 p-3">&nbsp;</div>
-            <div class="w-100 p-3">&nbsp;</div>
+          <h1 class="display-4 mb-4 p-0">Safest place to chat</h1>
+          <p class="lead mb-5 p-0">
+            Choose a nickname, a channel name and a password for the channel. 
+          </p>
+          <div class="text-left">
+              <span>1. Enter your nickname (lowercase)
+                <i class="fas fa-check-circle fa-5 green" aria-hidden="true"
+                  *ngIf="userFormControl.get('nickname').valid"></i>
+                <i class="fa fa-times-circle fa-5 red" aria-hidden="true"
+                  *ngIf="userFormControl.get('nickname').invalid && userFormControl.get('nickname').touched" ></i>
+              </span> 
+              <input class="form-control form-control-lg mr-sm-3 px-4" 
+                formControlName="nickname"
+                type="text" 
+                name="nickname" 
+                placeholder="Nickname" 
+                maxlength="20"
+                oninput="this.value = this.value.toLowerCase()"
+              >
+              <span>2. Enter your channel (lowercase)
+                <i class="fas fa-check-circle fa-5 green" aria-hidden="true"
+                  *ngIf="userFormControl.get('channel').valid"></i>
+                <i class="fa fa-times-circle fa-5 red" aria-hidden="true"
+                  *ngIf="userFormControl.get('channel').invalid && userFormControl.get('channel').touched" ></i>
+              </span>
+              <input class="form-control form-control-lg mr-sm-3 px-4" 
+                formControlName="channel"
+                type="text" 
+                name="channel" 
+                placeholder="Channel"
+                maxlength="20"
+                oninput="this.value = this.value.toLowerCase()"
+              >
+              <span>3. Enter your channel password
+                <i class="fas fa-check-circle fa-5 green" aria-hidden="true"
+                  *ngIf="userFormControl.get('secret').valid"></i>
+                <i class="fa fa-times-circle fa-5 red" aria-hidden="true"
+                  *ngIf="userFormControl.get('secret').invalid && userFormControl.get('secret').touched" ></i>
+              </span>
+              <input class="form-control form-control-lg mr-sm-3 px-4"
+                formControlName="secret" 
+                type="password" 
+                name="password" 
+                placeholder="Password" 
+              >
           </div>
+          <br>
+          <button class="btn btn-primary btn-lg mt-sm-0" 
+            name="submit" 
+            type="submit"
+            (click)="onJoin()" 
+            [disabled]="userFormControl.invalid">Join!</button>
+          <br>
+          <p>
+            <a  href="#"><b>All the messages here are end-to-end encrypted which
+                means that only the participants in the channel can read them.</b></a>
+          </p>
+        </div>
       </div>
       <br>
       <br>
