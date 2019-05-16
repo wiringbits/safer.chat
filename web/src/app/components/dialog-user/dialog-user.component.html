@@ -1,53 +1,10 @@
-<h3 mat-dialog-title>{{params.title}}</h3>
 <mat-dialog-content>
-  <div [formGroup]="userFormControl" (keyup.enter)="onJoin()">
-    <p>
-      <mat-form-field>
-        <input matInput 
-          placeholder="Nickname" 
-          formControlName="nickname" 
-          required 
-          maxlength="20" 
-          oninput="this.value = this.value.toLowerCase()" autocapitalize="none">
-        <mat-error *ngIf="userFormControl.get('nickname').hasError('required')">
-          This field is required</mat-error>
-        <mat-error *ngIf="userFormControl.get('nickname').hasError('pattern')">
-            This field is invalid</mat-error>
-      </mat-form-field>
-    </p>
-    <p>
-      <mat-form-field>
-        <input matInput 
-          placeholder="Channel" 
-          formControlName="channel" 
-          required 
-          maxlength="20"
-          oninput="this.value = this.value.toLowerCase()" 
-          autocapitalize="none">
-         <mat-error *ngIf="userFormControl.get('channel').hasError('required')">
-            This field is required</mat-error>
-          <mat-error *ngIf="userFormControl.get('channel').hasError('pattern')">
-              This field is invalid</mat-error>
-      </mat-form-field>
-    </p>
-    <mat-form-field>
-        <input matInput 
-        placeholder="Password" 
-        type="password"
-        formControlName="secret" 
-        required>
-        <mat-error>This field is required</mat-error>
-      </mat-form-field>
-  </div>
+<h2 mat-dialog-title>Disconnect</h2>
+<h6> Do you really want to log out? </h6>
 </mat-dialog-content>
 
-<mat-dialog-actions *ngIf="params?.dialogType === 0" [attr.align]="'end'">
-  <button mat-raised-button color="primary" mat-dialog-close (click)="onJoin()" 
-    [disabled]="userFormControl.invalid">Join!</button>
-</mat-dialog-actions>
-
-<mat-dialog-actions *ngIf="params?.dialogType === 1" [attr.align]="'end'">
-  <button mat-button mat-dialog-close color="secondary">Close</button>
-  <button mat-raised-button color="primary" [disabled]="userFormControl.invalid" 
-    mat-dialog-close (click)="onJoin()">Join!</button>
+<mat-dialog-actions [attr.align]="'end'">
+  <button mat-button mat-dialog-close color="secondary">Cancel</button>
+  <button mat-raised-button color="primary"
+    mat-dialog-close (click)="logOut()">Log Out</button>
 </mat-dialog-actions>

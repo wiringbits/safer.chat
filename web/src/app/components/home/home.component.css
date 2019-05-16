@@ -9,7 +9,7 @@ a {
 }
 
 a:hover {
-    color: #ff6600
+    color: #1B80BF
 }
 
 .btn {
@@ -25,20 +25,20 @@ a:hover {
 }
 
 .btn-primary {
-    background-color: #ff6600;
-    border-color: #ff6600
+    background-color: #BF2C47;
+    border-color: #BF2C47
 }
 
 .btn-primary:hover {
-    background-color: #d35400;
-    border-color: #d35400;
+    background-color: #BF2C47;
+    border-color: #BF2C47;
 }
 
 .btn-primary.focus,
 .btn-primary:focus,
 .btn-primary:not([disabled]):not(.disabled):active {
-    background-color: #d35400;
-    border-color: #d35400;
+    background-color: #BF2C47;
+    border-color: #BF2C47;
     box-shadow: 0 0 0 3px #ff809f
 }
 
@@ -187,7 +187,7 @@ header:after {
     left: 0;
     bottom: 0;
     z-index: 1;
-    background-color: #ff6600
+    background-color: #1B80BF
 }
 
 @media screen and (min-width: 992px) {

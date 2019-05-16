@@ -15,33 +15,35 @@
 .chat-input {
     padding-top: 20px;
     width: 80%; 
+    margin: 2%;
 }
 
 .chat-list {
     overflow: auto;
-    position: fixed;
-    top: 90px;
-    left: 25px;
-    right: 25px;
-    bottom: 120px;
+    position: absolute;
+    margin: 2%;
+    top: 2px;
+    bottom: 100px;
+    width: 95%;
 }
 
 .chat-list-item {
-    margin-top: 2px;
-    margin-bottom: 2px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    margin-right: 5px;
     border-radius: 5px;
     background-color: #E8EAF6;
-}
-
-.main-card {
-    height: 100%;  
+    width: -moz-available;          /* For Mozzila */
+    box-sizing: border-box;
 }
 
 .chat-footer-container {
-    position:fixed;
-    bottom:25px;
-    left:25px;
-    right:25px;
+    overflow: auto;
+    position: absolute;
+    bottom: 0px;
+    margin: 2%;
+    width: -moz-available;          /* For Mozzila */
+    width: -webkit-fill-available;  /* For Chrome. */
 }
 
 .chat-notification {
@@ -54,6 +56,20 @@
 
 mat-list-item {
     height: auto !important;
-    padding-top: 3px !important;
-    padding-bottom: 3px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
 }
+
+.sidenav-container {
+    position: absolute;
+    top: 105px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+
+.swing {
+    opacity: 0;
+    transform: rotateY(-90deg);
+    transition: all 0.5s cubic-bezier(.36,-0.64,.34,1.76);
+  }

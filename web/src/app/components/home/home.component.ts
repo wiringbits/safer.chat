@@ -2,10 +2,10 @@ import { Component, OnInit, AfterViewInit} from '@angular/core';
 import { fromEvent } from 'rxjs';
 import { FormGroup, FormControl, Validators } from '@angular/forms';
 import { ChatService } from 'src/app/services/chat.service';
-import { MatSnackBar } from '@angular/material';
+import { MatSnackBar, MatSnackBarRef, SimpleSnackBar } from '@angular/material';
 import { Action, User, Message, Event, DialogUserType, Channel } from '../../models';
 import { CryptoService } from 'src/app/services/crypto.service';
-import { RouterModule, Routes, Router } from '@angular/router';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-home',
@@ -19,6 +19,8 @@ export class HomeComponent implements OnInit, AfterViewInit {
   user: User;
   channel: Channel;
   peers: User[] = [];
+  errorMessages: MatSnackBarRef<SimpleSnackBar>;
+
 
   constructor(private chatService: ChatService,
               private snackBar: MatSnackBar,
@@ -41,14 +43,9 @@ export class HomeComponent implements OnInit, AfterViewInit {
     this.chatService.connect();
 
     this.chatService.messages.subscribe(
-      message => {
-        this.receiveMessages(message);
-      },
-      error => {
-        this.snackBar.open('The server is not available, try again later');
-      }, () => {
-        console.log('disconected');
-      }
+      message => { this.receiveMessages(message); },
+      error   => { this.manageErrors(error); },
+      ()      => { this.reconnectSocket(); }
     );
   }
 
@@ -60,25 +57,6 @@ export class HomeComponent implements OnInit, AfterViewInit {
         Validators.pattern('(^[^- ])([a-z0-9 _ -.]{1,18})([^- ])$')]),
       secret: new FormControl('', Validators.required)
     });
-  }
-
-  public async onJoin() {
-    if (this.userFormControl.invalid) {
-      return;
-    }
-
-    this.user = new User(
-      this.userFormControl.get('nickname').value,
-      this.cryptoService.getPublicKey(),
-      this.cryptoService.getBase64PublicKey());
-
-    this.channel = new Channel(
-      this.userFormControl.get('channel').value,
-      this.userFormControl.get('secret').value);
-
-    this.channel.sha256Secret = await this.cryptoService.sha256(this.channel.secret);
-
-    this.JoinChannel();
   }
 
   private async receiveMessages(message) {
@@ -103,21 +81,32 @@ export class HomeComponent implements OnInit, AfterViewInit {
     }
   }
 
-  private JoinChannel(): void {
-    let message: any;
-    message = {
-      type : Action.JOIN,
-      data : {
-        channel : this.channel.name,
-        secret : this.channel.sha256Secret,
-        name : {
-          name : this.user.name,
-          key: this.user.base64EncodedPublicKey
-        }
-      }
-    };
+  private manageErrors(error) {
+    this.errorMessages = this.snackBar.open('The server is not available, try again later');
+    this.reconnectSocket();
+  }
 
-    this.chatService.send(message);
+  private reconnectSocket() {
+    setTimeout(() => this.initIoConnection(), 1000);
+  }
+
+  public async onJoin() {
+    if (this.userFormControl.invalid) {
+      return;
+    }
+
+    this.user = new User(
+      this.userFormControl.get('nickname').value,
+      this.cryptoService.getPublicKey(),
+      this.cryptoService.getBase64PublicKey());
+
+    this.channel = new Channel(
+      this.userFormControl.get('channel').value,
+      this.userFormControl.get('secret').value);
+
+    this.channel.sha256Secret = await this.cryptoService.sha256(this.channel.secret);
+
+    this.chatService.JoinChannel(this.user, this.channel);
   }
 
 }

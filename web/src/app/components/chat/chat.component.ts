@@ -14,7 +14,6 @@ const  WELCOMEMESSAGE = `
   means that only the participants in the channel can read them.
   share your channel name and password and enjoy`;
 
-const SAFERCHAT = 'safer.chat';
 const POP_UP_MSJ_DURATION_MS = 1000; // 10 seg
 const INTERVAL_FOR_CONNECTION_MS = 60000; // 60 seg
 
@@ -59,34 +58,47 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.channel = this.chatService.getChannnel();
     this.peers = this.chatService.getInitialPeers();
+
+    this. showActivePeers();
     this.initIoConnection();
 
     this.intervalForConection = setInterval(() => {
       this.sendEmptyMessage(this.chatService);
     }, INTERVAL_FOR_CONNECTION_MS);
+
+    window.onunload = window.onbeforeunload = () => {
+      return confirm('Are you sure to reload the page?  al data will be lost');
+    };
+  }
+
+  private showActivePeers() {
+    if (this.messages.length === 0) {
+      this.peers.forEach(peer => {
+        this.messages.push(new Message(peer, Event.PEER_JOINED));
+      });
+    }
   }
 
   ngOnDestroy(): void {
    clearInterval(this.intervalForConection);
   }
 
-
   private initIoConnection(): void {
     this.chatService.connect();
 
     this.chatService.messages.subscribe(
-      message => {
-        this.receiveMessages(message);
-      },
-      error => {
-        this.errorMessages = this.snackBar.open('The server is not available, try again later');
-      }, () => {
-        this.chatService.connect();
-      }
+      message => { this.receiveMessages(message); },
+      error   => { this.manageErrors(error); },
+      ()      => { this.reconnectSocket(); }
     );
   }
 
   private async receiveMessages(message) {
+
+    if (this.errorMessages !== undefined) {
+      this.errorMessages.dismiss();
+    }
+
     switch (message.type) {
       case Event.PEER_JOINED:
       {
@@ -94,7 +106,7 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
         const newPeer: User = new User(message.data.who.name, publicKey, message.data.who.key);
         this.peers.push(newPeer);
         this.messages.push(new Message(newPeer, message.type));
-        this.sendBrowserNotification(newPeer.name, Event.PEER_JOINED);
+        this.chatService.sendBrowserNotification(newPeer.name, Event.PEER_JOINED);
         break;
       }
       case Event.MESSAGE_RECEIVED:
@@ -102,7 +114,7 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
         const messageDecrypted = await this.cryptoService.decrypt(message.data.message);
         const fromUser: User = this.peers.find(peer => peer.name === message.data.from.name);
         this.messages.push(new Message(fromUser, message.type, messageDecrypted));
-        this.sendBrowserNotification(fromUser.name, Event.MESSAGE_RECEIVED);
+        this.chatService.sendBrowserNotification(fromUser.name, Event.MESSAGE_RECEIVED);
         break;
       }
       case Event.PEER_LEFT:
@@ -112,15 +124,24 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
         this.messages.push(new Message(userLeft, message.type));
 
         this.peers.splice(indexPeer, 1);
-        this.sendBrowserNotification(userLeft.name, Event.PEER_LEFT);
+        this.chatService.sendBrowserNotification(userLeft.name, Event.PEER_LEFT);
         break;
       }
       case Event.COMMAND_REJECTED:
       {
-        this.snackBar.open(message.data.reason, 'OK', {duration: POP_UP_MSJ_DURATION_MS});
         this.openUserPopup(this.dialogParams);
+        this.snackBar.open(message.data.reason, 'OK', {duration: POP_UP_MSJ_DURATION_MS});
       }
     }
+  }
+
+  private manageErrors(error) {
+    this.errorMessages = this.snackBar.open('The server is not available, try again later');
+    this.reconnectSocket();
+  }
+
+  private reconnectSocket() {
+    setTimeout(() => this.initIoConnection(), 1000);
   }
 
   private sendEmptyMessage(chatService: ChatService) {
@@ -163,25 +184,9 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
           this.chatService.send(message);
         });
     });
+
     this.messages.push(new Message(this.user, Event.MESSAGE_RECEIVED, messageContent));
-    console.log(this.messages);
     this.messageContent = '';
-  }
-
-  private joinChannel(): void {
-    const message = {
-      type : Action.JOIN,
-      data : {
-        channel : this.channel.name,
-        secret : this.channel.sha256Secret,
-        name : {
-          name : this.user.name,
-          key: this.user.base64EncodedPublicKey
-        }
-      }
-    };
-
-    this.chatService.send(message);
   }
 
   private leaveChannel() {
@@ -190,15 +195,7 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   public onClickUserInfo() {
-    this.openUserPopup({
-      data: {
-        nickname: this.user.name,
-        title: 'Edit Details',
-        dialogType: DialogUserType.EDIT,
-        channel: this.channel.name,
-        secret: this.channel.secret
-      }
-    });
+    this.openUserPopup({ });
   }
 
   private openUserPopup(params): void {
@@ -208,54 +205,12 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
 
-      this.user = new User(
-        paramsDialog.username,
-        this.cryptoService.getPublicKey(),
-        this.cryptoService.getBase64PublicKey());
-
-      this.channel = new Channel(
-        paramsDialog.channel,
-        paramsDialog.secret);
-
-      this.channel.sha256Secret = await this.cryptoService.sha256(paramsDialog.secret);
-      // send notification to service
-      this.chatService.setChannnel(this.channel);
-      this.chatService.setUser(this.user);
-
-      if (paramsDialog.dialogType === DialogUserType.EDIT) {
+      if (paramsDialog.logout) {
         this.leaveChannel();
-        this.joinChannel();
+        this.chatService.setChannnel(undefined);
+        this.chatService.setUser(undefined);
+        this.router.navigateByUrl('');
       }
     });
-  }
-
-  private sendBrowserNotification (user: string, type: string) {
-
-    let notificationMsj: string;
-
-    if (document.hasFocus()) {
-      return;
-    }
-
-    switch (type) {
-      case Event.MESSAGE_RECEIVED : {
-        notificationMsj = `New message from ${user}`;
-        break;
-      }
-      case Event.PEER_JOINED: {
-        notificationMsj = `${user} joined the channel`;
-        break;
-      }
-      case Event.PEER_LEFT: {
-        notificationMsj = `${user} left the channel`;
-        break;
-      }
-    }
-
-    if (!('Notification' in window)) {
-      return;
-    } else if (Notification.permission === 'granted') {
-      const _ = new Notification(notificationMsj);
-    }
   }
 }

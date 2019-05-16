@@ -4,7 +4,7 @@ import { Subject, BehaviorSubject} from 'rxjs';
 import { map } from 'rxjs/operators';
 import { WebSocketService } from './webSocket.service';
 import { environment } from '../../environments/environment';
-import { Channel, User } from '../models';
+import { Channel, User, Event, Action} from '../models';
 
 
 @Injectable({
@@ -15,16 +15,14 @@ export class ChatService {
     public messages: Subject<any>;
     private channel: Channel;
     private user: User;
-    private peers: User[];
+    private peers: User[] = [];
 
     constructor(private wsService: WebSocketService) { }
 
     public connect() {
-      if (this.messages === undefined) {
-        this.messages = <Subject<any>>this.wsService
-          .connect(environment.SERVER_URL)
-          .pipe(map( response => JSON.parse(response.data) ) );
-      }
+      this.messages = <Subject<any>>this.wsService
+        .connect(environment.SERVER_URL)
+        .pipe(map( response => JSON.parse(response.data) ) );
     }
 
     public setChannnel(channel: Channel) {
@@ -57,5 +55,51 @@ export class ChatService {
 
     public send(message) {
       this.messages.next(message);
+    }
+
+    public sendBrowserNotification (user: string, type: string) {
+
+      let notificationMsj: string;
+
+      if (document.hasFocus()) {
+        return;
+      }
+
+      switch (type) {
+        case Event.MESSAGE_RECEIVED : {
+          notificationMsj = `New message from ${user}`;
+          break;
+        }
+        case Event.PEER_JOINED: {
+          notificationMsj = `${user} joined the channel`;
+          break;
+        }
+        case Event.PEER_LEFT: {
+          notificationMsj = `${user} left the channel`;
+          break;
+        }
+      }
+
+      if (!('Notification' in window)) {
+        return;
+      } else if (Notification.permission === 'granted') {
+        const _ = new Notification(notificationMsj);
+      }
+    }
+
+    public JoinChannel(user: User,  channel: Channel): void {
+     const message = {
+        type : Action.JOIN,
+        data : {
+          channel : channel.name,
+          secret : channel.sha256Secret,
+          name : {
+            name : user.name,
+            key: user.base64EncodedPublicKey
+          }
+        }
+      };
+
+      this.send(message);
     }
 }
