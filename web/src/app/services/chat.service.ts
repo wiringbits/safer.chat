@@ -4,7 +4,8 @@ import { Subject, BehaviorSubject} from 'rxjs';
 import { map } from 'rxjs/operators';
 import { WebSocketService } from './webSocket.service';
 import { environment } from '../../environments/environment';
-import { Channel, User, Event, Action} from '../models';
+import { Room, User, Event, Action} from '../models';
+import { CryptoService } from './crypto.service';
 
 
 @Injectable({
@@ -13,11 +14,12 @@ import { Channel, User, Event, Action} from '../models';
 export class ChatService {
 
     public messages: Subject<any>;
-    private channel: Channel;
+    private channel: Room;
     private user: User;
     private peers: User[] = [];
 
-    constructor(private wsService: WebSocketService) { }
+    constructor(private wsService: WebSocketService,
+                private cryptoService: CryptoService) { }
 
     public connect() {
       this.messages = <Subject<any>>this.wsService
@@ -25,11 +27,11 @@ export class ChatService {
         .pipe(map( response => JSON.parse(response.data) ) );
     }
 
-    public setChannnel(channel: Channel) {
+    public setRoom(channel: Room) {
       this.channel = channel;
     }
 
-    public getChannnel() {
+    public getRoom() {
       return this.channel;
     }
 
@@ -87,12 +89,12 @@ export class ChatService {
       }
     }
 
-    public JoinChannel(user: User,  channel: Channel): void {
+    public JoinRoom(user: User,  room: Room): void {
      const message = {
         type : Action.JOIN,
         data : {
-          channel : channel.name,
-          secret : channel.sha256Secret,
+          channel : room.name,
+          secret : room.sha256Secret,
           name : {
             name : user.name,
             key: user.base64EncodedPublicKey
@@ -101,5 +103,24 @@ export class ChatService {
       };
 
       this.send(message);
+    }
+
+    public sendChatMessage(messageContent: string) {
+      let message: any;
+
+      this.peers.forEach(peer => {
+        this.cryptoService
+          .encrypt(messageContent, peer.publicKey)
+          .then(encryptedMessage => {
+            message = {
+              type: Action.SENDMESSAGE,
+              data: {
+                to: peer.name,
+                message: encryptedMessage
+              }
+            };
+            this.send(message);
+          });
+      });
     }
 }

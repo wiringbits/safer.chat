@@ -24,17 +24,15 @@ export enum DialogUserType {
 }
 
 export class User {
-  id: number;
   avatar: string;
 
   constructor(
     public name: string,
+    public id: number,
     public publicKey?: CryptoKey,
     public base64EncodedPublicKey?: string) {
-
       this.name = name;
-      this.id = Math.floor(Math.random() * (1000000)) + 1;
-      this.avatar = `${environment.AVATAR_URL}/${this.id}.png`;
+      this.avatar = `../../../assets/avatar/man${this.id}.png`;
   }
 }
 
@@ -49,7 +47,7 @@ export class Message {
   }
 }
 
-export class Channel {
+export class Room {
   sha256Secret?: string;
   constructor (public name: string, public secret: string) {
     this.name = name;
@@ -62,12 +60,12 @@ export class DialogParams {
   public disableClose: boolean;
   public data: {
     user: User,
-    channel: Channel,
+    room: Room,
     title: string
   };
-  constructor (public user: User, public channel: Channel, disableClose: boolean) {
+  constructor (public user: User, public room: Room, disableClose: boolean) {
     this.data.user = user;
-    this.data.channel = channel;
+    this.data.room = room;
     this.disableClose = disableClose;
   }
 }

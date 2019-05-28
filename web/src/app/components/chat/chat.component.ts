@@ -4,18 +4,20 @@ import { MatDialog, MatDialogRef, MatList, MatListItem, MatSnackBar, MatSnackBar
 import { ChatService } from '../../services/chat.service';
 import { CryptoService } from '../../services/crypto.service';
 
-import { Action, User, Message, Event, DialogUserType, Channel, DialogParams } from '../../models';
+import { Action, User, Message, Event, DialogUserType, Room, DialogParams } from '../../models';
+import { Config } from '../../config';
 import { DialogUserComponent } from '../dialog-user/dialog-user.component';
 import { Router } from '@angular/router';
+import { element } from '@angular/core/src/render3';
 
-const  WELCOMEMESSAGE = `
-  Welcome to safer.chat, a really good place to chat,
-  all the messages here are end-to-end encrypted which
-  means that only the participants in the channel can read them.
-  share your channel name and password and enjoy`;
+const  WELCOME_MESSAGE = `
+  If you like our app, remember to give us a start on
+  https://github.com/wiringbits/safer.chat as well as to
+  submit your feedback on https://forms.gle/M4h4C8T5tvqHLR9q9`;
 
 const POP_UP_MSJ_DURATION_MS = 1000; // 10 seg
 const INTERVAL_FOR_CONNECTION_MS = 60000; // 60 seg
+const MOBILE_PIXELS = 720;
 
 @Component({
   selector: 'app-chat',
@@ -27,13 +29,14 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
   event = Event;
   action = Action;
   user: User;
-  channel: Channel;
+  room: Room;
   peers: User[] = [];
   messages: Message[] = [];
   messageContent: string;
   dialogRef: MatDialogRef<DialogUserComponent> | null;
   errorMessages: MatSnackBarRef<SimpleSnackBar>;
   intervalForConection;
+  desktop = true;
 
   dialogParams: DialogParams;
 
@@ -42,7 +45,14 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
     private chatService: ChatService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
-    private router: Router ) {}
+    private router: Router ) {
+      this.user = this.chatService.getUser();
+
+      if (this.user === undefined) {
+        this.chatService.setRoom(new Room(this.router.url.substring(1), ''));
+        this.router.navigateByUrl('');
+      }
+    }
 
   // getting a reference to the overall list, which is the parent container of the list items
   @ViewChild(MatList, { read: ElementRef }) matList: ElementRef;
@@ -51,15 +61,10 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChildren(MatListItem, { read: ElementRef }) matListItems: QueryList<MatListItem>;
 
   ngOnInit(): void {
-    this.user = this.chatService.getUser();
-    if (this.user === undefined) {
-      this.router.navigateByUrl('');
-    }
 
-    this.channel = this.chatService.getChannnel();
+    this.room = this.chatService.getRoom();
     this.peers = this.chatService.getInitialPeers();
 
-    this. showActivePeers();
     this.initIoConnection();
 
     this.intervalForConection = setInterval(() => {
@@ -69,9 +74,10 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
     window.onunload = window.onbeforeunload = () => {
       return confirm('Are you sure to reload the page?  al data will be lost');
     };
+    this. showActivePeers();
   }
 
-  private showActivePeers() {
+  private showActivePeers(): void {
     if (this.messages.length === 0) {
       this.peers.forEach(peer => {
         this.messages.push(new Message(peer, Event.PEER_JOINED));
@@ -95,15 +101,13 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async receiveMessages(message) {
 
-    if (this.errorMessages !== undefined) {
-      this.errorMessages.dismiss();
-    }
+    this.snackBar.dismiss();
 
     switch (message.type) {
       case Event.PEER_JOINED:
       {
         const publicKey = await this.cryptoService.decodeBase64PublicKey(message.data.who.key);
-        const newPeer: User = new User(message.data.who.name, publicKey, message.data.who.key);
+        const newPeer: User = new User(message.data.who.name, this.getNewId(), publicKey, message.data.who.key);
         this.peers.push(newPeer);
         this.messages.push(new Message(newPeer, message.type));
         this.chatService.sendBrowserNotification(newPeer.name, Event.PEER_JOINED);
@@ -135,16 +139,16 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private manageErrors(error) {
+  private manageErrors(error): void {
     this.errorMessages = this.snackBar.open('The server is not available, try again later');
     this.reconnectSocket();
   }
 
-  private reconnectSocket() {
+  private reconnectSocket(): void {
     setTimeout(() => this.initIoConnection(), 1000);
   }
 
-  private sendEmptyMessage(chatService: ChatService) {
+  private sendEmptyMessage(chatService: ChatService): void {
     this.chatService.connect();
     chatService.send({});
   }
@@ -154,6 +158,7 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
     this.matListItems.changes.subscribe(elements => {
       this.scrollToBottom();
     });
+    this.desktop = window.innerWidth > MOBILE_PIXELS;
   }
 
   private scrollToBottom(): void {
@@ -163,39 +168,33 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  public sendMessage(messageContent: string) {
-    let message: any;
+  public sendMessage(messageContent: string): void {
 
     if (!messageContent) {
       return;
     }
 
-    this.peers.forEach(peer => {
-      this.cryptoService
-        .encrypt(messageContent, peer.publicKey)
-        .then(encryptedMessage => {
-          message = {
-            type: Action.SENDMESSAGE,
-            data: {
-              to: peer.name,
-              message: encryptedMessage
-            }
-          };
-          this.chatService.send(message);
-        });
-    });
+    this.chatService.sendChatMessage(messageContent);
 
     this.messages.push(new Message(this.user, Event.MESSAGE_RECEIVED, messageContent));
     this.messageContent = '';
   }
 
-  private leaveChannel() {
+  private leaveRoom(): void {
     const message =  { type: Action.LEFT };
     this.chatService.send(message);
   }
 
-  public onClickUserInfo() {
+  public onClickUserInfo(): void {
     this.openUserPopup({ });
+  }
+
+  private getNewId(): number {
+    for (let i = 2; i <= Config.maxPeersPerRoom; i++) {
+      if (this.peers.find(peer => peer.id === i) === undefined ) {
+        return i;
+      }
+    }
   }
 
   private openUserPopup(params): void {
@@ -206,8 +205,8 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       if (paramsDialog.logout) {
-        this.leaveChannel();
-        this.chatService.setChannnel(undefined);
+        this.leaveRoom();
+        this.chatService.setRoom(undefined);
         this.chatService.setUser(undefined);
         this.router.navigateByUrl('');
       }

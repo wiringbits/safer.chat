@@ -5,7 +5,7 @@ import { ToastrModule } from 'ngx-toastr';
 
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
-
+import { BlockUI, NgBlockUI, BlockUIModule } from 'ng-block-ui';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 
@@ -32,7 +32,10 @@ import { ChatComponent } from './components/chat/chat.component';
     ReactiveFormsModule,
     HttpClientModule,
     SharedModule,
-    ToastrModule.forRoot()
+    ToastrModule.forRoot(),
+    BlockUIModule.forRoot({
+      message: 'Loading..'
+    })
 
   ],
   providers: [

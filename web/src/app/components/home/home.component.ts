@@ -1,11 +1,13 @@
-import { Component, OnInit, AfterViewInit} from '@angular/core';
+import { Component, OnInit, AfterViewInit, Input} from '@angular/core';
 import { fromEvent } from 'rxjs';
 import { FormGroup, FormControl, Validators } from '@angular/forms';
 import { ChatService } from 'src/app/services/chat.service';
 import { MatSnackBar, MatSnackBarRef, SimpleSnackBar } from '@angular/material';
-import { Action, User, Message, Event, DialogUserType, Channel } from '../../models';
+import { User, Event, Room } from '../../models';
 import { CryptoService } from 'src/app/services/crypto.service';
 import { Router } from '@angular/router';
+import { BlockUI, NgBlockUI } from 'ng-block-ui';
+
 
 @Component({
   selector: 'app-home',
@@ -13,14 +15,14 @@ import { Router } from '@angular/router';
   styleUrls: ['./home.component.css']
 })
 export class HomeComponent implements OnInit, AfterViewInit {
+  @BlockUI() blockUI: NgBlockUI;
 
   scrolled = false;
   userFormControl: FormGroup;
   user: User;
-  channel: Channel;
+  room: Room;
   peers: User[] = [];
   errorMessages: MatSnackBarRef<SimpleSnackBar>;
-
 
   constructor(private chatService: ChatService,
               private snackBar: MatSnackBar,
@@ -30,6 +32,10 @@ export class HomeComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     this.userFormControl = this.createFormGroup();
     this.initIoConnection();
+    this.room = this.chatService.getRoom();
+    if (this.room !== undefined) {
+      this.userFormControl.get('room').setValue( this.room.name);
+    }
   }
 
   ngAfterViewInit(): void {
@@ -53,25 +59,28 @@ export class HomeComponent implements OnInit, AfterViewInit {
     return new FormGroup({
       nickname: new FormControl('', [Validators.required,
         Validators.pattern('(^[^- ])([a-z0-9 _ -]{1,18})([^- ])$')]),
-      channel: new FormControl('', [Validators.required,
+      room: new FormControl('', [Validators.required,
         Validators.pattern('(^[^- ])([a-z0-9 _ -.]{1,18})([^- ])$')]),
       secret: new FormControl('', Validators.required)
     });
   }
 
   private async receiveMessages(message) {
+    this.snackBar.dismiss();
+    this.blockUI.stop();
     switch (message.type) {
       case Event.CHANNELJOINED:
       {
-        this.chatService.setChannnel(this.channel);
+        this.chatService.setRoom(this.room);
         this.chatService.setUser(this.user);
+        let id = 2;
         message.data.peers.forEach(async peer => {
           const publicKey = await this.cryptoService.decodeBase64PublicKey(peer.key);
-          const user: User = new User(peer.name, publicKey, peer.key);
+          const user: User = new User(peer.name, id++, publicKey, peer.key);
           this.peers.push(user);
         });
         this.chatService.setInitialPeers(this.peers);
-        this.router.navigateByUrl(`/${this.channel.name}`);
+        this.router.navigateByUrl(`/${this.room.name}`);
         break;
       }
       case Event.COMMAND_REJECTED:
@@ -82,7 +91,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   private manageErrors(error) {
-    this.errorMessages = this.snackBar.open('The server is not available, try again later');
+    this.snackBar.open('The server is not available, try again later');
     this.reconnectSocket();
   }
 
@@ -94,19 +103,18 @@ export class HomeComponent implements OnInit, AfterViewInit {
     if (this.userFormControl.invalid) {
       return;
     }
-
+    this.blockUI.start();
     this.user = new User(
       this.userFormControl.get('nickname').value,
+      1,
       this.cryptoService.getPublicKey(),
       this.cryptoService.getBase64PublicKey());
 
-    this.channel = new Channel(
-      this.userFormControl.get('channel').value,
+    this.room = new Room(
+      this.userFormControl.get('room').value,
       this.userFormControl.get('secret').value);
 
-    this.channel.sha256Secret = await this.cryptoService.sha256(this.channel.secret);
-
-    this.chatService.JoinChannel(this.user, this.channel);
+    this.room.sha256Secret = await this.cryptoService.sha256(this.room.secret);
+    this.chatService.JoinRoom(this.user, this.room);
   }
-
 }

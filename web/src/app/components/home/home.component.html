@@ -2,7 +2,7 @@
   <div class="top-bar-inner container">
     <div class="row">
       <div class="col">
-        <a class="brand float-left" href="#"><b>Safer Chat</b></a>
+        <img src="../../../assets/img/logosaferchat.png" class="mx-auto" alt="image">
       </div>
     </div>
   </div>
@@ -11,11 +11,13 @@
 <header class="d-flex">
   <div class="container">
     <div class="row">
-      <div class="col-lg-6 d-flex align-items-center"[formGroup]="userFormControl" (keyup.enter)="onJoin()">
+      <div class="col-lg-6 d-flex align-items-center"
+        [formGroup]="userFormControl" 
+        (keyup.enter)="onJoin()">
         <div class="header-text px-5 pl-lg-0 text-center text-lg-left">
-          <h1 class="display-4 mb-4 p-0">Safest place to chat</h1>
+          <h1 class="display-4 mb-4 p-0">Secure chat on your computer or smartphone</h1>
           <p class="lead mb-5 p-0">
-            Choose a nickname, a channel name and a password for the channel. 
+            Share the room and password with your friends and you'll be able to chat securely with no need to install anything
           </p>
           <div class="text-left">
               <span>1. Enter your nickname (lowercase)
@@ -32,21 +34,21 @@
                 maxlength="20"
                 oninput="this.value = this.value.toLowerCase()"
               >
-              <span>2. Enter your channel (lowercase)
+              <span>2. Enter your room (lowercase)
                 <i class="fas fa-check-circle fa-5 green" aria-hidden="true"
-                  *ngIf="userFormControl.get('channel').valid"></i>
+                  *ngIf="userFormControl.get('room').valid"></i>
                 <i class="fa fa-times-circle fa-5 red" aria-hidden="true"
-                  *ngIf="userFormControl.get('channel').invalid && userFormControl.get('channel').touched" ></i>
+                  *ngIf="userFormControl.get('room').invalid && userFormControl.get('room').touched" ></i>
               </span>
               <input class="form-control form-control-lg mr-sm-3 px-4" 
-                formControlName="channel"
+                formControlName="room"
                 type="text" 
-                name="channel" 
-                placeholder="Channel"
+                name="room" 
+                placeholder="Room"
                 maxlength="20"
                 oninput="this.value = this.value.toLowerCase()"
               >
-              <span>3. Enter your channel password
+              <span>3. Enter your room password
                 <i class="fas fa-check-circle fa-5 green" aria-hidden="true"
                   *ngIf="userFormControl.get('secret').valid"></i>
                 <i class="fa fa-times-circle fa-5 red" aria-hidden="true"
@@ -66,9 +68,14 @@
             (click)="onJoin()" 
             [disabled]="userFormControl.invalid">Join!</button>
           <br>
-          <p>
-            <a  href="#"><b>All the messages here are end-to-end encrypted which
-                means that only the participants in the channel can read them.</b></a>
+          <p class="information">
+            <span>
+              <b>All the messages use end-to-end encryption, 
+                which means that only people who can read the messages are the ones 
+                communicating. No one else can see the conversation, 
+                not even a people with access to the safer.chat servers.
+              </b>
+            </span>
           </p>
         </div>
       </div>
@@ -88,17 +95,15 @@
         <div class="lg-12">
           <ul class="nav">
             <li class="nav-item">
-              <a class="nav-link" target="_blank" href="#">Privacy Policy</a>
+              <a class="nav-link" target="_blank" href="https://github.com/wiringbits/safer.chat">
+                Contribute on Github <i class="fab fa-github"></i></a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" target="_blank" href="#">Terms &amp; Conditions</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="mailto:chat@wiringbits.net">Contact</a>
+              <a class="nav-link" target="_blank" href="https://forms.gle/M4h4C8T5tvqHLR9q9">Submit feedback</a>
             </li>
           </ul>
           <div class="copyright p-3">
-            <b>Wiring Bits All rights reserved</b>
+            <b>Wiring Bits All rights reserved (saferchat@wiringbits.net)</b>
           </div>
         </div>
       </div>
