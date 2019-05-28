@@ -91,6 +91,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   private manageErrors(error) {
+    this.blockUI.stop();
     this.snackBar.open('The server is not available, try again later');
     this.reconnectSocket();
   }

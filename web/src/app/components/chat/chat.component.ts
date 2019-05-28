@@ -8,7 +8,6 @@ import { Action, User, Message, Event, DialogUserType, Room, DialogParams } from
 import { Config } from '../../config';
 import { DialogUserComponent } from '../dialog-user/dialog-user.component';
 import { Router } from '@angular/router';
-import { element } from '@angular/core/src/render3';
 
 const  WELCOME_MESSAGE = `
   If you like our app, remember to give us a start on
@@ -86,7 +85,7 @@ export class ChatComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-   clearInterval(this.intervalForConection);
+    clearInterval(this.intervalForConection);
   }
 
   private initIoConnection(): void {
