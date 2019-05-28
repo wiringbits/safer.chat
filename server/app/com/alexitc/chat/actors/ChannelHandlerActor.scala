@@ -26,7 +26,7 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor with
       if (channel.peers.size >= config.maxPeersOnChannel) {
         exceededTries = exceededTries + 1
         log.info(s"Rejecting peer due to channel full, failed $exceededTries times")
-        who.ref ! Event.PeerRejected(s"The channel is full, if you need bigger channels, write us to ${config.supportEmail}")
+        who.ref ! Event.PeerRejected(s"The room is full, if you need bigger rooms, write us to ${config.supportEmail}")
       } else if (channel.secret == secret) {
         for {
           newState <- joinChannelUnsafe(channels, who, channel)
@@ -37,7 +37,7 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor with
           context become withChannelsState(newState)
         }
       } else {
-        who.ref ! Event.PeerRejected("The secret or the channel is incorrect")
+        who.ref ! Event.PeerRejected("The secret or the room is incorrect")
       }
 
     // a peer can belong to a single channel, find where it is and remove it
@@ -68,7 +68,7 @@ class ChannelHandlerActor(config: ChannelHandlerActor.Config) extends Actor with
   }
 
   private def joinChannelUnsafe(channels: State, who: Peer.HasRef, channel: Channel): Option[State] = {
-    log.info(s"a peer with name=${who.name} is trying to join channel=${channel.name}")
+    log.info(s"a peer with name=${who.name} is trying to join room=${channel.name}")
     joinChannel(who, channel) match {
       case Left(rejectionEvent) =>
         log.info(s"rejecting command, name=${who.name}, reason = ${rejectionEvent.reason}")
