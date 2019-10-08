@@ -49,7 +49,7 @@ class PeerActorSpec
 
     "reject bob due to wrong secret" in {
       bob.actor ! PeerActor.Command.JoinChannel(channelName, Channel.Secret("what?"), bob.peer)
-      bob.client.expectMsg(PeerActor.Event.CommandRejected("The secret or the channel is incorrect"))
+      bob.client.expectMsg(PeerActor.Event.CommandRejected("The secret or the room is incorrect"))
     }
 
     "allow bob to join" in {
@@ -59,7 +59,7 @@ class PeerActorSpec
 
     "reject carlos due to channel being full" in {
       carlos.actor ! PeerActor.Command.JoinChannel(channelName, channelSecret, carlos.peer)
-      carlos.client.expectMsg(PeerActor.Event.CommandRejected("The channel is full, if you need bigger channels, write us to support@hidden.chat"))
+      carlos.client.expectMsg(PeerActor.Event.CommandRejected("The room is full, if you need bigger rooms, write us to support@hidden.chat"))
     }
 
     "notify alice that bob has joined" in {
