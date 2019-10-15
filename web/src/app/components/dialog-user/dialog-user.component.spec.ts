@@ -1,4 +1,6 @@
 import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material';
 
 import { DialogUserComponent } from './dialog-user.component';
 
@@ -8,9 +10,13 @@ describe('DialogUserComponent', () => {
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ DialogUserComponent ]
-    })
-    .compileComponents();
+      declarations: [ DialogUserComponent ],
+      schemas: [ CUSTOM_ELEMENTS_SCHEMA ],
+      providers: [
+        { provide: MatDialogRef, value: {} },
+        { provide: MAT_DIALOG_DATA, value: [] }
+      ]
+    }).compileComponents();
   }));
 
   beforeEach(() => {

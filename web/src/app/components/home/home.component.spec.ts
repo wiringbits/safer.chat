@@ -1,4 +1,8 @@
 import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms'
+import { RouterTestingModule } from '@angular/router/testing';
+import { CryptoService } from 'src/app/services/crypto.service';
+import { MatSnackBar } from '@angular/material';
 
 import { HomeComponent } from './home.component';
 
@@ -8,7 +12,16 @@ describe('HomeComponent', () => {
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ HomeComponent ]
+      imports: [
+        FormsModule,
+        ReactiveFormsModule,
+        RouterTestingModule
+      ],
+      declarations: [ HomeComponent ],
+      providers: [
+        CryptoService,
+        { provide: MatSnackBar, useValue: {} },
+      ]
     })
     .compileComponents();
   }));
