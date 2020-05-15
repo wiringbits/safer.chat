@@ -5,3 +5,4 @@
 
 
 GET /ws controllers.ChannelsController.ws()
+GET /health controllers.ChannelsController.health()
