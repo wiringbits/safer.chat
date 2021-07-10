@@ -18,7 +18,8 @@ scalacOptions ++= Seq(
   "-Ywarn-numeric-widen",
   "-Ywarn-value-discard",
   "-Ywarn-unused",
-  "-Ywarn-unused-import"
+  "-Ywarn-unused-import",
+  "-Ywarn-macros:after"
 )
 
 lazy val root = (project in file("."))
